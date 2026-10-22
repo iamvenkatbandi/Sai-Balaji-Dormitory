@@ -20,9 +20,6 @@ export function PropertyPhoto({ image, priority = false, className = '' }: Props
           className="h-full w-full object-cover"
         />
       </div>
-      <figcaption className="border-t border-line bg-surface px-3 py-2 text-xs text-muted">
-        {image.caption}
-      </figcaption>
     </figure>
   );
 }

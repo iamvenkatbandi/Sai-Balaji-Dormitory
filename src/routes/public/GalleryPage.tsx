@@ -40,11 +40,7 @@ export function GalleryPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow="Gallery"
-        title="Photography"
-        intro="All images below are illustrative renders, not actual photographs. Verified photographs of the property will replace them once taken."
-      />
+      <PageHeader eyebrow="Gallery" title="Photography" />
 
       <div className="mb-6 flex flex-wrap gap-2">
         {CATEGORIES.map((c) => (
