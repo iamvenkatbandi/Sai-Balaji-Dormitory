@@ -315,6 +315,19 @@ function BedDrawer({
     try { (e.target as HTMLInputElement).showPicker?.(); } catch {}
   };
 
+  function clearForm() {
+    setFromDate('');
+    setFromHour('10');
+    setFromMinute('00');
+    setFromPeriod('AM');
+    setToDate('');
+    setToHour('10');
+    setToMinute('00');
+    setToPeriod('AM');
+    setReason('');
+    setErr(null);
+  }
+
   function buildIso(dateStr: string, hourStr: string, minuteStr: string, period: 'AM' | 'PM') {
     if (!dateStr) return '';
     let h = parseInt(hourStr, 10);
@@ -406,9 +419,18 @@ function BedDrawer({
 
           {canBlock && (
             <div className="mt-6 border-t border-line pt-4">
-              <h3 className="text-sm font-semibold text-ink">Block for maintenance</h3>
-              <form onSubmit={doBlock} className="mt-3 space-y-4">
-                
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-ink">Block for maintenance</h3>
+                <button
+                  type="button"
+                  onClick={clearForm}
+                  className="text-xs font-medium text-brand-900 hover:underline"
+                >
+                  Clear all
+                </button>
+              </div>
+              
+              <form onSubmit={doBlock} className="space-y-4">
                 <div>
                   <p className="mb-1.5 block text-sm font-medium text-ink">
                     From <span className="text-[#B3261E]">*</span>
