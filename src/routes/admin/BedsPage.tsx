@@ -267,10 +267,7 @@ function BunkUnit({
         <BedTile row={upper} onClick={() => onSelect(upper.space_id)} />
       ) : (
         <div className="flex flex-col items-center opacity-25">
-          <div
-            className="rounded-lg border border-dashed border-line"
-            style={{ width: 52, height: 88 }}
-          />
+          <div className="rounded-lg border border-dashed border-line" style={{ width: 52, height: 88 }} />
           <span className="mt-1 text-[10px] text-muted">—</span>
         </div>
       )}
@@ -279,10 +276,7 @@ function BunkUnit({
         <BedTile row={lower} onClick={() => onSelect(lower.space_id)} />
       ) : (
         <div className="flex flex-col items-center opacity-25">
-          <div
-            className="rounded-lg border border-dashed border-line"
-            style={{ width: 52, height: 88 }}
-          />
+          <div className="rounded-lg border border-dashed border-line" style={{ width: 52, height: 88 }} />
           <span className="mt-1 text-[10px] text-muted">—</span>
         </div>
       )}
@@ -341,22 +335,44 @@ function BedDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-40 flex justify-end bg-black/30"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
       role="dialog"
       aria-modal="true"
+      aria-labelledby="bed-modal-title"
       onClick={onClose}
     >
       <div
-        className="h-full w-full max-w-md overflow-y-auto bg-surface shadow-overlay"
+        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-card bg-surface shadow-overlay"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-line p-4">
-          <h2 className="text-base font-semibold text-ink">Bed details</h2>
-          <button onClick={onClose} className="rounded-input px-2 py-1 text-sm text-muted hover:bg-bg">
-            Close
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
+          <h2 id="bed-modal-title" className="text-base font-semibold text-ink">
+            Bed details
+          </h2>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded-input p-1.5 text-muted hover:bg-bg hover:text-ink"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
           </button>
         </div>
-        <div className="p-4">
+
+        <div className="px-5 py-4">
           {detail.status === 'loading' && <Spinner />}
           {detail.status === 'error' && <ErrorState message={detail.error.message} />}
           {detail.status === 'success' && <BedDetailBody detail={detail.data} />}
