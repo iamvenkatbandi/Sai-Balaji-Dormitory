@@ -112,7 +112,7 @@ export function AdminBedsPage() {
         intro="Click a bed for details. Use the women-reserved panel to designate safe beds for female guests."
       />
 
-      <div className="mb-4 rounded-card border border-line bg-surface p-4">
+      <div className="mb-3 rounded-card border border-line bg-surface p-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold text-ink">Women-reserved configuration</h3>
@@ -141,7 +141,7 @@ export function AdminBedsPage() {
         )}
       </div>
 
-      <div className="mb-3 space-y-2">
+      <div className="mb-4 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-input border border-line bg-surface">
             <button
@@ -221,9 +221,10 @@ export function AdminBedsPage() {
         />
       )}
 
+      {/* AC GRID - 10 columns, fills width, legible tiles */}
       {allBeds.status === 'success' && section === 'AC' && grouped.individual.length > 0 && (
-        <div className="mx-auto max-w-[560px] rounded-card border border-line bg-bg p-3">
-          <div className="grid grid-cols-10 gap-1.5">
+        <div className="w-full rounded-card border border-line bg-bg p-4">
+          <div className="grid grid-cols-5 gap-3 sm:grid-cols-10">
             {grouped.individual.map((row) => (
               <CompactBedTile
                 key={row.space_id}
@@ -235,9 +236,10 @@ export function AdminBedsPage() {
         </div>
       )}
 
+      {/* NON-AC GRID - 20 columns, fills width, legible bunk cells */}
       {allBeds.status === 'success' && section === 'NON_AC' && grouped.units.length > 0 && (
-        <div className="mx-auto max-w-[980px] rounded-card border border-line bg-bg p-3">
-          <div className="grid grid-cols-[repeat(20,minmax(0,1fr))] gap-1">
+        <div className="w-full rounded-card border border-line bg-bg p-4">
+          <div className="grid grid-cols-10 gap-2 sm:grid-cols-[repeat(20,minmax(0,1fr))]">
             {grouped.units.map((unit) => (
               <CompactBunk
                 key={unit.unitCode}
@@ -269,9 +271,14 @@ export function AdminBedsPage() {
   );
 }
 
+// ─── AC Bed Tile (Sized up for legibility) ────────────────────────
 function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) {
   const s = STATUS_STYLE[row.status];
   const title = `${row.code} — ${s.label}${row.current_booking_reference ? ` · ${row.current_booking_reference}` : ''}${row.women_reserved ? ' · women-reserved' : ''}`;
+  // Shorten family compartment IDs for display (e.g., F-001-B1 -> F1-B1)
+  const displayCode = row.code.startsWith('F-') 
+    ? row.code.replace('F-00', 'F').replace('F-0', 'F') 
+    : row.code.replace('AC-', '');
 
   return (
     <button
@@ -279,28 +286,31 @@ function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) 
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="group relative h-[46px] w-full rounded-sm border-2 transition-transform hover:scale-110 hover:z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-900"
+      className="group relative flex h-[64px] w-full flex-col items-center justify-between rounded-md border-2 py-1 transition-transform hover:scale-105 hover:z-10 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-900"
       style={{ background: s.fill, borderColor: s.border }}
     >
-      <span
-        className="absolute inset-x-1 top-1 h-1.5 rounded-sm"
-        style={{ background: s.pillow }}
-      />
+      {/* Pillow */}
+      <div className="h-2 w-3/4 rounded-sm opacity-60" style={{ background: s.pillow }} />
+      
+      {/* Bed ID */}
+      <span className="font-mono text-[10px] font-semibold tracking-tight" style={{ color: s.text }}>
+        {displayCode}
+      </span>
+
+      {/* Women-reserved badge */}
       {row.women_reserved && (
         <span
-          className="absolute -right-1 -top-1 grid h-3 w-3 place-items-center rounded-full bg-[#B3261E] text-[7px] font-bold text-white shadow"
+          className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-[#B3261E] text-[8px] font-bold text-white shadow"
           aria-label="women-reserved"
         >
           W
         </span>
       )}
-      <span className="absolute inset-x-0 bottom-0.5 font-mono text-[7px] leading-none" style={{ color: s.text }}>
-        {row.code.replace('AC-', '')}
-      </span>
     </button>
   );
 }
 
+// ─── Non-AC Bunk (Sized up for legibility) ────────────────────────
 function CompactBunk({ unitCode, spaces, onSelect }: {
   unitCode: string;
   spaces: BedRow[];
@@ -308,22 +318,26 @@ function CompactBunk({ unitCode, spaces, onSelect }: {
 }) {
   const upper = spaces.find((s) => s.position === 'upper');
   const lower = spaces.find((s) => s.position === 'lower');
+  const displayCode = unitCode.replace('NA-', '');
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center w-full">
       {upper ? (
         <CompactBunkCell row={upper} letter="U" onClick={() => onSelect(upper.space_id)} />
       ) : (
-        <div className="h-5 w-full rounded-sm border border-dashed border-line opacity-25" />
+        <div className="h-7 w-full rounded-sm border border-dashed border-line opacity-25" />
       )}
-      <div className="h-0.5" />
+      
+      <div className="h-1" />
+      
       {lower ? (
         <CompactBunkCell row={lower} letter="L" onClick={() => onSelect(lower.space_id)} />
       ) : (
-        <div className="h-5 w-full rounded-sm border border-dashed border-line opacity-25" />
+        <div className="h-7 w-full rounded-sm border border-dashed border-line opacity-25" />
       )}
-      <span className="mt-0.5 font-mono text-[7px] leading-none text-muted">
-        {unitCode.replace('NA-', '')}
+      
+      <span className="mt-1 font-mono text-[9px] font-medium text-muted">
+        {displayCode}
       </span>
     </div>
   );
@@ -343,18 +357,19 @@ function CompactBunkCell({ row, letter, onClick }: {
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="group relative h-5 w-full rounded-sm border text-[8px] font-bold transition-transform hover:scale-110 hover:z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-900"
+      className="group relative flex h-7 w-full items-center justify-between rounded-sm border px-1.5 transition-transform hover:scale-110 hover:z-10 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-900"
       style={{ background: s.fill, borderColor: s.border, color: s.text }}
     >
-      <span className="absolute left-1 top-1/2 -translate-y-1/2 leading-none">{letter}</span>
+      <span className="text-[10px] font-bold">{letter}</span>
+      
       {row.women_reserved && (
-        <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-[#B3261E]" />
+        <span className="h-2 w-2 rounded-full bg-[#B3261E]" aria-hidden />
       )}
     </button>
   );
 }
 
-// ─── Proposal modal ────────────────────────────────────────────────
+// ─── Proposal modal (Unchanged) ────────────────────────────────────
 function ProposalModal({ onClose, onApplied }: { onClose: () => void; onApplied: () => void }) {
   const proposal = useAsync(() => proposeWomenReserved(AC_TARGET, NA_BUNK_TARGET), []);
   const [acknowledged, setAcknowledged] = useState(false);
@@ -490,7 +505,7 @@ function ProposalModal({ onClose, onApplied }: { onClose: () => void; onApplied:
   );
 }
 
-// ─── Detail drawer (unchanged behavior, small style tweaks) ────────
+// ─── Bed Drawer (Unchanged) ────────────────────────────────────────
 function BedDrawer({
   spaceId, canBlock, onClose, onChanged,
 }: {
