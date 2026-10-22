@@ -88,3 +88,39 @@ export interface BookingStatusRow {
   product_type: ProductType;
   total_paise: number | null;
 }
+
+export interface SupportTicket {
+  id: string;
+  profile_id: string;
+  booking_id: string | null;
+  category: 'booking' | 'facility' | 'safety' | 'billing' | 'other';
+  subject: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+}
+
+export interface SupportTicketMessage {
+  id: string;
+  ticket_id: string;
+  author_profile_id: string | null;
+  author_kind: 'guest' | 'staff';
+  body: string;
+  created_at: string;
+}
+
+export interface ExtensionRequest {
+  id: string;
+  booking_id: string;
+  requested_by_profile_id: string;
+  requested_new_end: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  reason: string | null;
+  quoted_extra_paise: number | null;
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  review_note: string | null;
+}

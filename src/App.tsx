@@ -19,6 +19,17 @@ import { LegalPage } from './routes/public/LegalPage';
 import { BookingWizard } from './routes/public/BookingWizard';
 import { NotFoundPage } from './routes/public/NotFoundPage';
 
+import { PortalLayout } from './layouts/PortalLayout';
+import { DashboardPage } from './routes/portal/DashboardPage';
+import { MyBookingsPage } from './routes/portal/MyBookingsPage';
+import { MyBookingDetailPage } from './routes/portal/MyBookingDetailPage';
+import { MyAccommodationPage } from './routes/portal/MyAccommodationPage';
+import { PaymentsPage } from './routes/portal/PaymentsPage';
+import { SupportListPage } from './routes/portal/SupportListPage';
+import { NewSupportPage } from './routes/portal/NewSupportPage';
+import { SupportTicketPage } from './routes/portal/SupportTicketPage';
+import { ProfilePage } from './routes/portal/ProfilePage';
+
 function PhasePlaceholder({ name, phase }: { name: string; phase: string }) {
   return (
     <div className="mx-auto max-w-3xl py-16">
@@ -53,10 +64,17 @@ const router = createBrowserRouter([
   },
   {
     path: '/portal',
-    element: <GuestGuard><Outlet /></GuestGuard>,
+    element: <GuestGuard><PortalLayout /></GuestGuard>,
     children: [
-      { index: true, element: <PhasePlaceholder name="Guest portal" phase="Phase 3" /> },
-      { path: '*', element: <PhasePlaceholder name="Guest portal" phase="Phase 3" /> },
+      { index: true, element: <DashboardPage /> },
+      { path: 'bookings', element: <MyBookingsPage /> },
+      { path: 'bookings/:id', element: <MyBookingDetailPage /> },
+      { path: 'accommodation', element: <MyAccommodationPage /> },
+      { path: 'payments', element: <PaymentsPage /> },
+      { path: 'support', element: <SupportListPage /> },
+      { path: 'support/new', element: <NewSupportPage /> },
+      { path: 'support/:id', element: <SupportTicketPage /> },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
   {
