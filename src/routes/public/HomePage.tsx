@@ -117,7 +117,7 @@ export function HomePage() {
           </form>
         </div>
 
-        <PropertyPhoto image={IMAGES.heroAcHall} priority />
+        <PropertyPhoto image={IMAGES.heroAcHall} priority aspectClass="aspect-[16/9]" />
       </section>
 
       <section className="grid gap-6 md:grid-cols-2">

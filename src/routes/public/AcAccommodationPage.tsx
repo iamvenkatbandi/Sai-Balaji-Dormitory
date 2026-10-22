@@ -84,7 +84,7 @@ export function AcAccommodationPage() {
       </div>
 
       <div className="mt-6">
-        <PropertyPhoto image={IMAGES.acHallOverview} />
+        <PropertyPhoto image={IMAGES.acHallOverview} aspectClass="aspect-[16/9]" />
       </div>
     </>
   );

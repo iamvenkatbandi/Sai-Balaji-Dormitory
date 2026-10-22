@@ -66,7 +66,7 @@ export function NonAcAccommodationPage() {
       </div>
 
       <div className="mt-6">
-        <PropertyPhoto image={IMAGES.nonAcHallOverview} />
+        <PropertyPhoto image={IMAGES.nonAcHallOverview} aspectClass="aspect-[16/9]" />
       </div>
     </>
   );
