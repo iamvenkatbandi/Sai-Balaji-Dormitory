@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useAsync } from '../../lib/useAsync';
-import { getBedsStatus, getBedDetail, blockBed, releaseBlock } from '../../lib/admin';
+import {
+  getBedsStatus, getBedDetail, blockBed, releaseBlock,
+  proposeWomenReserved, applyWomenReserved, revokeWomenReserved,
+  type ProposedSpace,
+} from '../../lib/admin';
 import type { AdminOutletContext } from '../../components/Guards';
 import { PageHeader } from '../../components/PageHeader';
 import { Spinner } from '../../components/Spinner';
@@ -34,34 +38,48 @@ const FILTER_OPTIONS: Array<{ value: BedStatus | 'all'; label: string }> = [
 const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
 const MINUTES = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
 
+const AC_TARGET = 10;
+const NA_BUNK_TARGET = 30;
+
 export function AdminBedsPage() {
   const { permissions } = useOutletContext<AdminOutletContext>();
   const canBlock = permissions.includes('beds.block');
+  const canManageWomen = permissions.includes('inventory.manage');
 
   const [section, setSection] = useState<'AC' | 'NON_AC'>('AC');
   const [status, setStatus] = useState<BedStatus | 'all'>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
+  const [showProposal, setShowProposal] = useState(false);
 
-  const beds = useAsync(() => getBedsStatus({ section }), [section]);
+  const allBeds = useAsync(() => getBedsStatus({}), []);
+
+  const sectionFiltered = useMemo(() => {
+    if (allBeds.status !== 'success') return [] as BedRow[];
+    return allBeds.data.filter((r) => r.section_code === section);
+  }, [allBeds.status === 'success' ? allBeds.data : null, section]);
 
   const filtered = useMemo(() => {
-    if (beds.status !== 'success') return [] as BedRow[];
-    let rows = beds.data;
+    let rows = sectionFiltered;
     if (status !== 'all') rows = rows.filter((r) => r.status === status);
     const q = search.trim().toLowerCase();
     if (q) rows = rows.filter((r) => r.code.toLowerCase().includes(q));
     return rows;
-  }, [beds.status === 'success' ? beds.data : null, status, search]);
+  }, [sectionFiltered, status, search]);
 
   const counts = useMemo(() => {
     const c: Record<BedStatus, number> = {
       available: 0, reserved: 0, occupied: 0,
       cleaning: 0, maintenance: 0, inactive: 0,
     };
-    if (beds.status === 'success') for (const r of beds.data) c[r.status]++;
+    for (const r of sectionFiltered) c[r.status]++;
     return c;
-  }, [beds.status === 'success' ? beds.data : null]);
+  }, [sectionFiltered]);
+
+  const acReserved = allBeds.status === 'success'
+    ? allBeds.data.filter((r) => r.women_reserved && r.section_code === 'AC').length : 0;
+  const naReserved = allBeds.status === 'success'
+    ? allBeds.data.filter((r) => r.women_reserved && r.section_code === 'NON_AC').length : 0;
 
   const grouped = useMemo(() => {
     if (section === 'NON_AC') {
@@ -82,106 +100,132 @@ export function AdminBedsPage() {
     };
   }, [filtered, section]);
 
+  function reload() {
+    window.location.reload();
+  }
+
   return (
     <>
       <PageHeader
         eyebrow="Inventory"
         title="Bed inventory"
-        intro="Live seat-map view of every sleeping space. Click a bed for details and actions."
+        intro="Click a bed for details. Use the women-reserved panel to designate safe beds for female guests."
       />
 
-      <div className="mb-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="mb-4 rounded-card border border-line bg-surface p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-ink">Women-reserved configuration</h3>
+            <p className="mt-1 text-xs text-muted">
+              {acReserved === 0 && naReserved === 0 ? (
+                <>No beds designated. Targets: {AC_TARGET} AC individual beds · {NA_BUNK_TARGET} Non-AC bunk units ({NA_BUNK_TARGET * 2} spaces).</>
+              ) : (
+                <>
+                  {acReserved} of {AC_TARGET} AC beds · {naReserved} of {NA_BUNK_TARGET * 2} Non-AC spaces designated.
+                </>
+              )}
+            </p>
+          </div>
+          {canManageWomen && (
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setShowProposal(true)}>
+                {acReserved === 0 && naReserved === 0 ? 'Review proposal' : 'Add / adjust'}
+              </Button>
+            </div>
+          )}
+        </div>
+        {(acReserved === 0 && naReserved === 0) && (
+          <p className="mt-2 rounded-input border border-[#FBF0DC] bg-[#FBF0DC] px-3 py-2 text-xs text-[#8A5A00]">
+            The published policy targets {AC_TARGET} AC individual beds and {NA_BUNK_TARGET * 2} Non-AC spaces for women-reserved use. Designate them here after verifying the physical layout.
+          </p>
+        )}
+      </div>
+
+      <div className="mb-3 space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-input border border-line bg-surface">
             <button
               onClick={() => setSection('AC')}
-              className={`rounded-l-input px-4 py-2 text-sm ${
+              className={`rounded-l-input px-3 py-1.5 text-xs ${
                 section === 'AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'
               }`}
             >
-              AC Hall
+              AC Hall · 50
             </button>
             <button
               onClick={() => setSection('NON_AC')}
-              className={`rounded-r-input px-4 py-2 text-sm ${
+              className={`rounded-r-input px-3 py-1.5 text-xs ${
                 section === 'NON_AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'
               }`}
             >
-              Non-AC Hall
+              Non-AC Hall · 100 bunks
             </button>
           </div>
-
           <input
-            className={`${inputClass} max-w-xs`}
+            className={`${inputClass} max-w-[180px] py-1.5 text-xs`}
             placeholder="Search bed ID"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Search bed ID"
           />
+          <div className="flex flex-wrap gap-1">
+            {FILTER_OPTIONS.map((opt) => {
+              const active = status === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setStatus(opt.value)}
+                  aria-pressed={active}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs ${
+                    active
+                      ? 'border-brand-900 bg-brand-900 text-white'
+                      : 'border-line bg-surface text-ink hover:bg-bg'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {FILTER_OPTIONS.map((opt) => {
-            const active = status === opt.value;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => setStatus(opt.value)}
-                aria-pressed={active}
-                className={`rounded-full border px-3 py-1 text-xs ${
-                  active
-                    ? 'border-brand-900 bg-brand-900 text-white'
-                    : 'border-line bg-surface text-ink hover:bg-bg'
-                }`}
-              >
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {beds.status === 'success' && (
-        <div className="mb-4 rounded-card border border-line bg-surface p-3">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+        {allBeds.status === 'success' && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
             {(['available', 'occupied', 'reserved', 'cleaning', 'maintenance', 'inactive'] as BedStatus[]).map((s) => (
-              <span key={s} className="inline-flex items-center gap-1.5">
+              <span key={s} className="inline-flex items-center gap-1">
                 <span
-                  className="inline-block h-3 w-3 rounded border"
+                  className="inline-block h-2.5 w-2.5 rounded border"
                   style={{ background: STATUS_STYLE[s].fill, borderColor: STATUS_STYLE[s].border }}
                 />
                 <span className="tabular-nums text-ink">{counts[s]}</span>
-                <span className="text-muted">{STATUS_STYLE[s].label}</span>
+                <span>{STATUS_STYLE[s].label}</span>
               </span>
             ))}
-            <span className="inline-flex items-center gap-1.5">
-              <span className="grid h-3.5 w-3.5 place-items-center rounded-full bg-[#B3261E] text-[8px] font-bold text-white">
-                W
-              </span>
-              <span className="text-muted">Women-reserved</span>
+            <span className="inline-flex items-center gap-1">
+              <span className="grid h-3 w-3 place-items-center rounded-full bg-[#B3261E] text-[7px] font-bold text-white">W</span>
+              <span>Women-reserved</span>
             </span>
-            <span className="ml-auto text-muted">
-              Showing <span className="tabular-nums text-ink">{filtered.length}</span>{' '}
-              of <span className="tabular-nums text-ink">{beds.data.length}</span>
+            <span className="ml-auto">
+              Showing <span className="tabular-nums text-ink">{filtered.length}</span> of <span className="tabular-nums text-ink">{sectionFiltered.length}</span>
             </span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {beds.status === 'loading' && <Spinner />}
-      {beds.status === 'error' && <ErrorState message={beds.error.message} />}
-      {beds.status === 'success' && filtered.length === 0 && (
+      {allBeds.status === 'loading' && <Spinner />}
+      {allBeds.status === 'error' && <ErrorState message={allBeds.error.message} />}
+      {allBeds.status === 'success' && filtered.length === 0 && (
         <EmptyState
           title="No beds match these filters."
           body="Adjust the section, status or search to see inventory."
         />
       )}
 
-      {beds.status === 'success' && section === 'AC' && grouped.individual.length > 0 && (
-        <div className="rounded-card border border-line bg-bg p-4">
-          <div className="grid grid-cols-4 justify-items-center gap-x-3 gap-y-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+      {allBeds.status === 'success' && section === 'AC' && grouped.individual.length > 0 && (
+        <div className="mx-auto max-w-[560px] rounded-card border border-line bg-bg p-3">
+          <div className="grid grid-cols-10 gap-1.5">
             {grouped.individual.map((row) => (
-              <BedTile
+              <CompactBedTile
                 key={row.space_id}
                 row={row}
                 onClick={() => setSelected(row.space_id)}
@@ -191,16 +235,18 @@ export function AdminBedsPage() {
         </div>
       )}
 
-      {beds.status === 'success' && section === 'NON_AC' && grouped.units.length > 0 && (
-        <div className="grid grid-cols-2 justify-items-center gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          {grouped.units.map((unit) => (
-            <BunkUnit
-              key={unit.unitCode}
-              unitCode={unit.unitCode}
-              spaces={unit.spaces}
-              onSelect={setSelected}
-            />
-          ))}
+      {allBeds.status === 'success' && section === 'NON_AC' && grouped.units.length > 0 && (
+        <div className="mx-auto max-w-[980px] rounded-card border border-line bg-bg p-3">
+          <div className="grid grid-cols-[repeat(20,minmax(0,1fr))] gap-1">
+            {grouped.units.map((unit) => (
+              <CompactBunk
+                key={unit.unitCode}
+                unitCode={unit.unitCode}
+                spaces={unit.spaces}
+                onSelect={setSelected}
+              />
+            ))}
+          </div>
         </div>
       )}
 
@@ -209,14 +255,21 @@ export function AdminBedsPage() {
           spaceId={selected}
           canBlock={canBlock}
           onClose={() => setSelected(null)}
-          onChanged={() => { setSelected(null); window.location.reload(); }}
+          onChanged={() => { setSelected(null); reload(); }}
+        />
+      )}
+
+      {showProposal && (
+        <ProposalModal
+          onClose={() => setShowProposal(false)}
+          onApplied={() => { setShowProposal(false); reload(); }}
         />
       )}
     </>
   );
 }
 
-function BedTile({ row, onClick }: { row: BedRow; onClick: () => void }) {
+function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) {
   const s = STATUS_STYLE[row.status];
   const title = `${row.code} — ${s.label}${row.current_booking_reference ? ` · ${row.current_booking_reference}` : ''}${row.women_reserved ? ' · women-reserved' : ''}`;
 
@@ -226,36 +279,29 @@ function BedTile({ row, onClick }: { row: BedRow; onClick: () => void }) {
       onClick={onClick}
       title={title}
       aria-label={title}
-      className="group flex flex-col items-center focus:outline-none"
+      className="group relative h-[46px] w-full rounded-sm border-2 transition-transform hover:scale-110 hover:z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-900"
+      style={{ background: s.fill, borderColor: s.border }}
     >
-      <div
-        className="relative rounded-lg border-2 transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-brand-900 group-focus-visible:ring-offset-2"
-        style={{ width: 52, height: 88, background: s.fill, borderColor: s.border }}
-      >
-        <div
-          className="absolute rounded"
-          style={{ top: 5, left: 5, right: 5, height: 16, background: s.pillow }}
-        />
-        {row.women_reserved && (
-          <span
-            className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full text-[9px] font-bold text-white shadow"
-            style={{ background: '#B3261E' }}
-            aria-hidden
-          >
-            W
-          </span>
-        )}
-      </div>
-      <span className="mt-1 font-mono text-[10px] leading-tight" style={{ color: s.text }}>
-        {row.code}
+      <span
+        className="absolute inset-x-1 top-1 h-1.5 rounded-sm"
+        style={{ background: s.pillow }}
+      />
+      {row.women_reserved && (
+        <span
+          className="absolute -right-1 -top-1 grid h-3 w-3 place-items-center rounded-full bg-[#B3261E] text-[7px] font-bold text-white shadow"
+          aria-label="women-reserved"
+        >
+          W
+        </span>
+      )}
+      <span className="absolute inset-x-0 bottom-0.5 font-mono text-[7px] leading-none" style={{ color: s.text }}>
+        {row.code.replace('AC-', '')}
       </span>
     </button>
   );
 }
 
-function BunkUnit({
-  unitCode, spaces, onSelect,
-}: {
+function CompactBunk({ unitCode, spaces, onSelect }: {
   unitCode: string;
   spaces: BedRow[];
   onSelect: (id: string) => void;
@@ -264,29 +310,187 @@ function BunkUnit({
   const lower = spaces.find((s) => s.position === 'lower');
 
   return (
-    <div className="flex flex-col items-center rounded-card border border-line bg-surface p-2">
-      <span className="mb-1 font-mono text-[10px] text-muted">{unitCode}</span>
+    <div className="flex flex-col items-center">
       {upper ? (
-        <BedTile row={upper} onClick={() => onSelect(upper.space_id)} />
+        <CompactBunkCell row={upper} letter="U" onClick={() => onSelect(upper.space_id)} />
       ) : (
-        <div className="flex flex-col items-center opacity-25">
-          <div className="rounded-lg border border-dashed border-line" style={{ width: 52, height: 88 }} />
-          <span className="mt-1 text-[10px] text-muted">—</span>
-        </div>
+        <div className="h-5 w-full rounded-sm border border-dashed border-line opacity-25" />
       )}
-      <div className="my-1 h-px w-10 bg-line" />
+      <div className="h-0.5" />
       {lower ? (
-        <BedTile row={lower} onClick={() => onSelect(lower.space_id)} />
+        <CompactBunkCell row={lower} letter="L" onClick={() => onSelect(lower.space_id)} />
       ) : (
-        <div className="flex flex-col items-center opacity-25">
-          <div className="rounded-lg border border-dashed border-line" style={{ width: 52, height: 88 }} />
-          <span className="mt-1 text-[10px] text-muted">—</span>
-        </div>
+        <div className="h-5 w-full rounded-sm border border-dashed border-line opacity-25" />
       )}
+      <span className="mt-0.5 font-mono text-[7px] leading-none text-muted">
+        {unitCode.replace('NA-', '')}
+      </span>
     </div>
   );
 }
 
+function CompactBunkCell({ row, letter, onClick }: {
+  row: BedRow;
+  letter: 'U' | 'L';
+  onClick: () => void;
+}) {
+  const s = STATUS_STYLE[row.status];
+  const title = `${row.code} (${letter === 'U' ? 'upper' : 'lower'}) — ${s.label}${row.women_reserved ? ' · women-reserved' : ''}`;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className="group relative h-5 w-full rounded-sm border text-[8px] font-bold transition-transform hover:scale-110 hover:z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-900"
+      style={{ background: s.fill, borderColor: s.border, color: s.text }}
+    >
+      <span className="absolute left-1 top-1/2 -translate-y-1/2 leading-none">{letter}</span>
+      {row.women_reserved && (
+        <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-[#B3261E]" />
+      )}
+    </button>
+  );
+}
+
+// ─── Proposal modal ────────────────────────────────────────────────
+function ProposalModal({ onClose, onApplied }: { onClose: () => void; onApplied: () => void }) {
+  const proposal = useAsync(() => proposeWomenReserved(AC_TARGET, NA_BUNK_TARGET), []);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const acProposal = proposal.status === 'success'
+    ? proposal.data.filter((p) => p.product_type === 'ac_individual') : [];
+  const naProposal = proposal.status === 'success'
+    ? proposal.data.filter((p) => p.product_type === 'non_ac_space') : [];
+  const naBunkCount = new Set(naProposal.map((p) => p.code.replace(/-[LU]$/, ''))).size;
+
+  async function apply() {
+    if (proposal.status !== 'success' || proposal.data.length === 0) return;
+    setApplying(true);
+    setErr(null);
+    try {
+      await applyWomenReserved(proposal.data.map((p) => p.space_id));
+      onApplied();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed to apply');
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-card bg-surface shadow-overlay"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
+          <h2 className="text-base font-semibold text-ink">Women-reserved proposal</h2>
+          <button onClick={onClose} aria-label="Close" className="rounded-input p-1.5 text-muted hover:bg-bg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <div className="rounded-input border border-[#FBEAE8] bg-[#FBEAE8] p-3 text-sm text-[#7A1A15]">
+            <strong>This is a starting proposal, not a safety claim.</strong> It selects
+            low-numbered beds for review. Before confirming, verify against the actual
+            physical layout — partitions, aisle position, proximity to other women-reserved
+            beds, ladder access for upper bunks, and washroom access.
+          </div>
+
+          {proposal.status === 'loading' && <Spinner />}
+          {proposal.status === 'error' && <ErrorState message={proposal.error.message} />}
+          {proposal.status === 'success' && proposal.data.length === 0 && (
+            <EmptyState
+              title="Nothing to add."
+              body={`Designation is already at or above the target of ${AC_TARGET} AC beds and ${NA_BUNK_TARGET} Non-AC bunk units.`}
+            />
+          )}
+
+          {proposal.status === 'success' && proposal.data.length > 0 && (
+            <>
+              <div>
+                <p className="text-sm font-semibold text-ink">
+                  Proposed additions ({proposal.data.length} spaces)
+                </p>
+                <p className="text-xs text-muted">
+                  {acProposal.length} AC individual beds · {naBunkCount} Non-AC bunk units ({naProposal.length} spaces)
+                </p>
+              </div>
+
+              {acProposal.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted">AC individual beds</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {acProposal.map((p) => (
+                      <span key={p.space_id} className="rounded border border-line bg-bg px-2 py-0.5 font-mono text-xs text-ink">{p.code}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {naProposal.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted">Non-AC bunk units</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {Array.from(new Set(naProposal.map((p) => p.code.replace(/-[LU]$/, '')))).sort().map((unit) => (
+                      <span key={unit} className="rounded border border-line bg-bg px-2 py-0.5 font-mono text-xs text-ink">{unit}</span>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted">
+                    Both the upper and lower space of each unit will be designated together.
+                  </p>
+                </div>
+              )}
+
+              <label className="flex items-start gap-2 rounded-input border border-line bg-bg p-3 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={acknowledged}
+                  onChange={(e) => setAcknowledged(e.target.checked)}
+                />
+                <span>
+                  I have verified the physical layout of these beds, confirmed they meet the
+                  property's safety requirements for women-reserved use, and accept
+                  responsibility for this designation. I understand I can revoke it at any
+                  time if the layout changes.
+                </span>
+              </label>
+
+              {err && <p role="alert" className="text-sm text-[#B3261E]">{err}</p>}
+            </>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-surface px-5 py-3">
+          <Button variant="secondary" onClick={onClose} disabled={applying}>Cancel</Button>
+          <Button
+            onClick={apply}
+            loading={applying}
+            disabled={!acknowledged || proposal.status !== 'success' || proposal.data.length === 0}
+          >
+            Apply designation
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Detail drawer (unchanged behavior, small style tweaks) ────────
 function BedDrawer({
   spaceId, canBlock, onClose, onChanged,
 }: {
@@ -311,21 +515,10 @@ function BedDrawer({
   const [blocking, setBlocking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const openPicker = (e: React.MouseEvent<HTMLInputElement>) => {
-    try { (e.target as HTMLInputElement).showPicker?.(); } catch {}
-  };
-
   function clearForm() {
-    setFromDate('');
-    setFromHour('10');
-    setFromMinute('00');
-    setFromPeriod('AM');
-    setToDate('');
-    setToHour('10');
-    setToMinute('00');
-    setToPeriod('AM');
-    setReason('');
-    setErr(null);
+    setFromDate(''); setFromHour('10'); setFromMinute('00'); setFromPeriod('AM');
+    setToDate(''); setToHour('10'); setToMinute('00'); setToPeriod('AM');
+    setReason(''); setErr(null);
   }
 
   function buildIso(dateStr: string, hourStr: string, minuteStr: string, period: 'AM' | 'PM') {
@@ -339,38 +532,25 @@ function BedDrawer({
   async function doBlock(e: React.FormEvent) {
     e.preventDefault();
     if (!fromDate || !toDate) return;
-    
     const fromIso = buildIso(fromDate, fromHour, fromMinute, fromPeriod);
     const toIso = buildIso(toDate, toHour, toMinute, toPeriod);
-
     if (new Date(toIso) <= new Date(fromIso)) {
-      setErr('End time must be after start time.');
-      return;
+      setErr('End time must be after start time.'); return;
     }
-
-    setBlocking(true);
-    setErr(null);
+    setBlocking(true); setErr(null);
     try {
       await blockBed(spaceId, fromIso, toIso, reason || 'Maintenance');
       onChanged();
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : 'Block failed');
-    } finally {
-      setBlocking(false);
-    }
+    } finally { setBlocking(false); }
   }
 
   async function doRelease(blockId: string) {
-    setBlocking(true);
-    setErr(null);
-    try {
-      await releaseBlock(blockId);
-      onChanged();
-    } catch (e2) {
-      setErr(e2 instanceof Error ? e2.message : 'Release failed');
-    } finally {
-      setBlocking(false);
-    }
+    setBlocking(true); setErr(null);
+    try { await releaseBlock(blockId); onChanged(); }
+    catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Release failed'); }
+    finally { setBlocking(false); }
   }
 
   return (
@@ -378,7 +558,6 @@ function BedDrawer({
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="bed-modal-title"
       onClick={onClose}
     >
       <div
@@ -386,26 +565,9 @@ function BedDrawer({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
-          <h2 id="bed-modal-title" className="text-base font-semibold text-ink">
-            Bed details
-          </h2>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-input p-1.5 text-muted hover:bg-bg hover:text-ink"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
+          <h2 className="text-base font-semibold text-ink">Bed details</h2>
+          <button onClick={onClose} aria-label="Close" className="rounded-input p-1.5 text-muted hover:bg-bg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -419,29 +581,20 @@ function BedDrawer({
 
           {canBlock && (
             <div className="mt-6 border-t border-line pt-4">
-              <div className="flex items-center justify-between mb-3">
+              <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-ink">Block for maintenance</h3>
-                <button
-                  type="button"
-                  onClick={clearForm}
-                  className="text-xs font-medium text-brand-900 hover:underline"
-                >
-                  Clear all
-                </button>
+                <button type="button" onClick={clearForm} className="text-xs font-medium text-brand-900 hover:underline">Clear all</button>
               </div>
-              
+
               <form onSubmit={doBlock} className="space-y-4">
                 <div>
-                  <p className="mb-1.5 block text-sm font-medium text-ink">
-                    From <span className="text-[#B3261E]">*</span>
-                  </p>
+                  <p className="mb-1.5 text-sm font-medium text-ink">From <span className="text-[#B3261E]">*</span></p>
                   <div className="flex gap-2">
                     <input
                       type="date"
                       className={`${inputClass} flex-1 cursor-pointer`}
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
-                      onClick={openPicker}
                       required
                     />
                     <div className="flex gap-1">
@@ -460,16 +613,13 @@ function BedDrawer({
                 </div>
 
                 <div>
-                  <p className="mb-1.5 block text-sm font-medium text-ink">
-                    To <span className="text-[#B3261E]">*</span>
-                  </p>
+                  <p className="mb-1.5 text-sm font-medium text-ink">To <span className="text-[#B3261E]">*</span></p>
                   <div className="flex gap-2">
                     <input
                       type="date"
                       className={`${inputClass} flex-1 cursor-pointer`}
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
-                      onClick={openPicker}
                       required
                     />
                     <div className="flex gap-1">
@@ -488,20 +638,11 @@ function BedDrawer({
                 </div>
 
                 <div>
-                  <label htmlFor="blk-reason" className="mb-1.5 block text-sm font-medium text-ink">
-                    Reason
-                  </label>
-                  <input
-                    id="blk-reason"
-                    className={inputClass}
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                  />
+                  <label htmlFor="blk-reason" className="mb-1.5 block text-sm font-medium text-ink">Reason</label>
+                  <input id="blk-reason" className={inputClass} value={reason} onChange={(e) => setReason(e.target.value)} />
                 </div>
 
-                <Button type="submit" loading={blocking}>
-                  Create block
-                </Button>
+                <Button type="submit" loading={blocking}>Create block</Button>
                 {err && <p role="alert" className="text-sm text-[#B3261E]">{err}</p>}
               </form>
 
@@ -512,17 +653,10 @@ function BedDrawer({
                     {detail.data.maintenance_history.map((b) => (
                       <li key={b.id} className="flex items-center justify-between rounded-input border border-line p-2">
                         <div>
-                          <p className="text-ink">
-                            {formatDateTime(b.blocked_from)} → {formatDateTime(b.blocked_to)}
-                          </p>
+                          <p className="text-ink">{formatDateTime(b.blocked_from)} → {formatDateTime(b.blocked_to)}</p>
                           {b.reason && <p className="text-xs text-muted">{b.reason}</p>}
                         </div>
-                        <button
-                          onClick={() => doRelease(b.id)}
-                          className="text-xs text-brand-900 hover:underline"
-                        >
-                          Release
-                        </button>
+                        <button onClick={() => doRelease(b.id)} className="text-xs text-brand-900 hover:underline">Release</button>
                       </li>
                     ))}
                   </ul>
