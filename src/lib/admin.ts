@@ -200,3 +200,39 @@ export async function updateSettings(input: {
   const { error } = await supabase.from('property_settings').update(input).eq('property_id', id);
   if (error) throw await rpcError(error);
 }
+
+export interface ProposedSpace {
+  space_id: string;
+  code: string;
+  product_type: ProductType;
+  bed_position: string;
+  rationale: string;
+}
+
+export async function proposeWomenReserved(
+  acTarget = 10,
+  naBunkTarget = 30,
+): Promise<ProposedSpace[]> {
+  const { data, error } = await supabase.rpc('admin_propose_women_reserved', {
+    p_ac_target: acTarget,
+    p_na_bunk_target: naBunkTarget,
+  });
+  if (error) throw await rpcError(error);
+  return (data ?? []) as ProposedSpace[];
+}
+
+export async function applyWomenReserved(spaceIds: string[]): Promise<number> {
+  const { data, error } = await supabase.rpc('admin_apply_women_reserved', {
+    p_space_ids: spaceIds,
+  });
+  if (error) throw await rpcError(error);
+  return data as number;
+}
+
+export async function revokeWomenReserved(spaceIds: string[]): Promise<number> {
+  const { data, error } = await supabase.rpc('admin_revoke_women_reserved', {
+    p_space_ids: spaceIds,
+  });
+  if (error) throw await rpcError(error);
+  return data as number;
+}
