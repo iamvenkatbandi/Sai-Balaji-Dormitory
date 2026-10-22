@@ -4,10 +4,11 @@ import { getPublishedRatePlans, getActiveFamilyPolicy } from '../../lib/queries'
 import { PageHeader } from '../../components/PageHeader';
 import { SectionCard } from '../../components/SectionCard';
 import { NotConfiguredNotice } from '../../components/NotConfiguredNotice';
-import { PlaceholderPhoto } from '../../components/PlaceholderPhoto';
+import { PropertyPhoto } from '../../components/PropertyPhoto';
 import { Button } from '../../components/Button';
 import { ErrorState } from '../../components/ErrorState';
 import { Spinner } from '../../components/Spinner';
+import { IMAGES } from '../../lib/images';
 
 export function AcAccommodationPage() {
   const plans = useAsync(getPublishedRatePlans, []);
@@ -33,7 +34,8 @@ export function AcAccommodationPage() {
       <div className="grid gap-6 md:grid-cols-2">
         <SectionCard title="30 individual AC beds" subtitle="Independently assigned sleeping spaces">
           <ul className="space-y-2 text-sm text-muted">
-            <li>Partitioned for individual privacy</li>
+            <li>Partitioned on all four sides with a doorway opening</li>
+            <li>Partition height approximately 170 cm — full standing privacy</li>
             <li>Women-reserved spaces designated by the property</li>
             <li>Access to the AC washroom group</li>
           </ul>
@@ -56,6 +58,7 @@ export function AcAccommodationPage() {
             <li>Reserved as a complete private unit</li>
             <li>Both beds belong to the same family reservation</li>
             <li>Never sold as two unrelated individual bookings</li>
+            <li>Partitions on all four sides with a private entrance</li>
           </ul>
           <div className="mt-5">
             {!familyPublished ? (
@@ -76,8 +79,12 @@ export function AcAccommodationPage() {
       </div>
 
       <div className="mt-10 grid gap-6 md:grid-cols-2">
-        <PlaceholderPhoto label="Representative image" caption="AC bed with partition — awaiting verified photography." />
-        <PlaceholderPhoto label="Representative image" caption="AC family compartment — awaiting verified photography." />
+        <PropertyPhoto image={IMAGES.acBedPartition} />
+        <PropertyPhoto image={IMAGES.acFamilyInside} />
+      </div>
+
+      <div className="mt-6">
+        <PropertyPhoto image={IMAGES.acHallOverview} />
       </div>
     </>
   );

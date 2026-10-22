@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { PageHeader } from '../../components/PageHeader';
-import { PlaceholderPhoto } from '../../components/PlaceholderPhoto';
+import { PropertyPhoto } from '../../components/PropertyPhoto';
+import { IMAGES, type PropertyImage } from '../../lib/images';
 
 type Category = 'all' | 'ac' | 'non-ac' | 'beds' | 'washrooms' | 'common';
 
@@ -13,28 +14,36 @@ const CATEGORIES: { key: Category; label: string }[] = [
   { key: 'common', label: 'Common areas' },
 ];
 
-const ITEMS: { category: Exclude<Category, 'all'>; label: string; caption: string }[] = [
-  { category: 'ac', label: 'AC Hall overview', caption: 'Representative placeholder — awaiting verified photography.' },
-  { category: 'ac', label: 'AC family compartment', caption: 'Representative placeholder — awaiting verified photography.' },
-  { category: 'non-ac', label: 'Non-AC Hall overview', caption: 'Representative placeholder — awaiting verified photography.' },
-  { category: 'non-ac', label: 'Non-AC bunk unit', caption: 'Representative placeholder — awaiting verified photography.' },
-  { category: 'beds', label: 'AC bed with partition', caption: 'Representative placeholder — awaiting verified photography.' },
-  { category: 'beds', label: 'Bunk lower and upper beds', caption: 'Representative placeholder — awaiting verified photography.' },
-  { category: 'washrooms', label: 'AC washroom group', caption: 'Representative placeholder — awaiting verified photography.' },
-  { category: 'washrooms', label: 'Non-AC washroom group', caption: 'Representative placeholder — awaiting verified photography.' },
-  { category: 'common', label: 'Common area', caption: 'Representative placeholder — awaiting verified photography.' },
+interface Tile {
+  category: Exclude<Category, 'all'>;
+  image: PropertyImage;
+}
+
+const TILES: Tile[] = [
+  { category: 'ac', image: IMAGES.heroAcHall },
+  { category: 'ac', image: IMAGES.acHallOverview },
+  { category: 'ac', image: IMAGES.acFamilyInside },
+  { category: 'ac', image: IMAGES.acFamilyDoor },
+  { category: 'non-ac', image: IMAGES.nonAcHallOverview },
+  { category: 'non-ac', image: IMAGES.nonAcHallAisle },
+  { category: 'beds', image: IMAGES.acBedPartition },
+  { category: 'beds', image: IMAGES.nonAcBunk },
+  { category: 'beds', image: IMAGES.nonAcBunkDetail },
+  { category: 'beds', image: IMAGES.bedTurnover },
+  { category: 'washrooms', image: IMAGES.acWashroomCorridor },
+  { category: 'washrooms', image: IMAGES.nonAcWashroomCorridor },
 ];
 
 export function GalleryPage() {
   const [cat, setCat] = useState<Category>('all');
-  const visible = cat === 'all' ? ITEMS : ITEMS.filter((i) => i.category === cat);
+  const visible = cat === 'all' ? TILES : TILES.filter((t) => t.category === cat);
 
   return (
     <>
       <PageHeader
         eyebrow="Gallery"
         title="Photography"
-        intro="Images below are labelled representative placeholders. Verified photographs of the actual property will replace them once supplied."
+        intro="All images below are illustrative renders, not actual photographs. Verified photographs of the property will replace them once taken."
       />
 
       <div className="mb-6 flex flex-wrap gap-2">
@@ -42,6 +51,7 @@ export function GalleryPage() {
           <button
             key={c.key}
             onClick={() => setCat(c.key)}
+            aria-pressed={cat === c.key}
             className={`rounded-full border px-4 py-1.5 text-sm ${
               cat === c.key
                 ? 'border-brand-900 bg-brand-900 text-white'
@@ -53,14 +63,14 @@ export function GalleryPage() {
         ))}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-        {visible.map((item) => (
-          <PlaceholderPhoto key={item.label} label={item.label} caption={item.caption} />
-        ))}
-      </div>
-
-      {visible.length === 0 && (
-        <p className="mt-8 text-sm text-muted">No images in this category yet.</p>
+      {visible.length === 0 ? (
+        <p className="text-sm text-muted">No images in this category yet.</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+          {visible.map((tile) => (
+            <PropertyPhoto key={tile.image.src} image={tile.image} />
+          ))}
+        </div>
       )}
     </>
   );

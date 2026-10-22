@@ -6,8 +6,9 @@ import { Button } from '../../components/Button';
 import { Field, inputClass } from '../../components/Field';
 import { SectionCard } from '../../components/SectionCard';
 import { FaqItem } from '../../components/FaqItem';
-import { PlaceholderPhoto } from '../../components/PlaceholderPhoto';
+import { PropertyPhoto } from '../../components/PropertyPhoto';
 import { NotConfiguredNotice } from '../../components/NotConfiguredNotice';
+import { IMAGES } from '../../lib/images';
 import type { ProductType } from '../../lib/database.types';
 
 export function HomePage() {
@@ -116,11 +117,7 @@ export function HomePage() {
           </form>
         </div>
 
-        <PlaceholderPhoto
-          label="Representative image"
-          caption="Property photography is pending upload."
-          aspect="aspect-[4/3]"
-        />
+        <PropertyPhoto image={IMAGES.heroAcHall} priority />
       </section>
 
       <section className="grid gap-6 md:grid-cols-2">

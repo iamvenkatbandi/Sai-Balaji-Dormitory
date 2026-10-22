@@ -4,10 +4,11 @@ import { getPublishedRatePlans } from '../../lib/queries';
 import { PageHeader } from '../../components/PageHeader';
 import { SectionCard } from '../../components/SectionCard';
 import { NotConfiguredNotice } from '../../components/NotConfiguredNotice';
-import { PlaceholderPhoto } from '../../components/PlaceholderPhoto';
+import { PropertyPhoto } from '../../components/PropertyPhoto';
 import { Button } from '../../components/Button';
 import { ErrorState } from '../../components/ErrorState';
 import { Spinner } from '../../components/Spinner';
+import { IMAGES } from '../../lib/images';
 
 export function NonAcAccommodationPage() {
   const plans = useAsync(getPublishedRatePlans, []);
@@ -32,6 +33,7 @@ export function NonAcAccommodationPage() {
             <li>Unit IDs: NA-001 through NA-100</li>
             <li>Each unit holds one lower bed and one upper bed</li>
             <li>Unit-level maintenance blocks both sleeping spaces</li>
+            <li>Fixed ladder and safety rail on the upper level</li>
           </ul>
         </SectionCard>
 
@@ -59,8 +61,12 @@ export function NonAcAccommodationPage() {
       </div>
 
       <div className="mt-10 grid gap-6 md:grid-cols-2">
-        <PlaceholderPhoto label="Representative image" caption="Non-AC bunk unit — awaiting verified photography." />
-        <PlaceholderPhoto label="Representative image" caption="Non-AC hall aisle — awaiting verified photography." />
+        <PropertyPhoto image={IMAGES.nonAcBunk} />
+        <PropertyPhoto image={IMAGES.nonAcBunkDetail} />
+      </div>
+
+      <div className="mt-6">
+        <PropertyPhoto image={IMAGES.nonAcHallOverview} />
       </div>
     </>
   );
