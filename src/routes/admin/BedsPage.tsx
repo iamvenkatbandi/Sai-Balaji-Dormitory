@@ -31,6 +31,9 @@ const FILTER_OPTIONS: Array<{ value: BedStatus | 'all'; label: string }> = [
   { value: 'inactive', label: 'Inactive' },
 ];
 
+const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+
 export function AdminBedsPage() {
   const { permissions } = useOutletContext<AdminOutletContext>();
   const canBlock = permissions.includes('beds.block');
@@ -295,28 +298,37 @@ function BedDrawer({
   const detail = useAsync(() => getBedDetail(spaceId), [spaceId]);
 
   const [fromDate, setFromDate] = useState('');
-  const [fromTime, setFromTime] = useState('10:00');
+  const [fromHour, setFromHour] = useState('10');
+  const [fromMinute, setFromMinute] = useState('00');
+  const [fromPeriod, setFromPeriod] = useState<'AM' | 'PM'>('AM');
+
   const [toDate, setToDate] = useState('');
-  const [toTime, setToTime] = useState('10:00');
+  const [toHour, setToHour] = useState('10');
+  const [toMinute, setToMinute] = useState('00');
+  const [toPeriod, setToPeriod] = useState<'AM' | 'PM'>('AM');
+
   const [reason, setReason] = useState('');
   const [blocking, setBlocking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Opens the native picker no matter where inside the field the user clicks
   const openPicker = (e: React.MouseEvent<HTMLInputElement>) => {
-    try {
-      (e.target as HTMLInputElement).showPicker?.();
-    } catch {
-      // Fallback if showPicker is not supported
-    }
+    try { (e.target as HTMLInputElement).showPicker?.(); } catch {}
   };
+
+  function buildIso(dateStr: string, hourStr: string, minuteStr: string, period: 'AM' | 'PM') {
+    if (!dateStr) return '';
+    let h = parseInt(hourStr, 10);
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    return new Date(`${dateStr}T${h.toString().padStart(2, '0')}:${minuteStr}:00`).toISOString();
+  }
 
   async function doBlock(e: React.FormEvent) {
     e.preventDefault();
-    if (!fromDate || !fromTime || !toDate || !toTime) return;
+    if (!fromDate || !toDate) return;
     
-    const fromIso = new Date(`${fromDate}T${fromTime}`).toISOString();
-    const toIso = new Date(`${toDate}T${toTime}`).toISOString();
+    const fromIso = buildIso(fromDate, fromHour, fromMinute, fromPeriod);
+    const toIso = buildIso(toDate, toHour, toMinute, toPeriod);
 
     if (new Date(toIso) <= new Date(fromIso)) {
       setErr('End time must be after start time.');
@@ -410,14 +422,18 @@ function BedDrawer({
                       onClick={openPicker}
                       required
                     />
-                    <input
-                      type="time"
-                      className={`${inputClass} w-32 cursor-pointer`}
-                      value={fromTime}
-                      onChange={(e) => setFromTime(e.target.value)}
-                      onClick={openPicker}
-                      required
-                    />
+                    <div className="flex gap-1">
+                      <select className={`${inputClass} w-16 cursor-pointer px-2`} value={fromHour} onChange={(e) => setFromHour(e.target.value)}>
+                        {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                      <select className={`${inputClass} w-16 cursor-pointer px-2`} value={fromMinute} onChange={(e) => setFromMinute(e.target.value)}>
+                        {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                      <select className={`${inputClass} w-20 cursor-pointer px-2`} value={fromPeriod} onChange={(e) => setFromPeriod(e.target.value as 'AM' | 'PM')}>
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
@@ -434,14 +450,18 @@ function BedDrawer({
                       onClick={openPicker}
                       required
                     />
-                    <input
-                      type="time"
-                      className={`${inputClass} w-32 cursor-pointer`}
-                      value={toTime}
-                      onChange={(e) => setToTime(e.target.value)}
-                      onClick={openPicker}
-                      required
-                    />
+                    <div className="flex gap-1">
+                      <select className={`${inputClass} w-16 cursor-pointer px-2`} value={toHour} onChange={(e) => setToHour(e.target.value)}>
+                        {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                      <select className={`${inputClass} w-16 cursor-pointer px-2`} value={toMinute} onChange={(e) => setToMinute(e.target.value)}>
+                        {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                      <select className={`${inputClass} w-20 cursor-pointer px-2`} value={toPeriod} onChange={(e) => setToPeriod(e.target.value as 'AM' | 'PM')}>
+                        <option value="AM">AM</option>
+                        <option value="PM">PM</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
 
