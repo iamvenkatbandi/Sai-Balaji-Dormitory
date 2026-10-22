@@ -11,6 +11,9 @@ import { NotConfiguredNotice } from '../../components/NotConfiguredNotice';
 import { IMAGES } from '../../lib/images';
 import type { ProductType } from '../../lib/database.types';
 
+const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+
 export function HomePage() {
   const nav = useNavigate();
   const contact = useAsync(getContact, []);
@@ -19,19 +22,32 @@ export function HomePage() {
 
   const [section, setSection] = useState<ProductType>('ac_individual');
   const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
+  const [hour, setHour] = useState('10');
+  const [minute, setMinute] = useState('00');
+  const [period, setPeriod] = useState<'AM' | 'PM'>('AM');
   const [hours, setHours] = useState(2);
 
   const c = contact.status === 'success' ? contact.data : null;
   const s = settings.status === 'success' ? settings.data : null;
   const anyRatePublished = plans.status === 'success' && plans.data.some((p) => p.published);
 
+  function buildIso(dateStr: string, hourStr: string, minuteStr: string, p: 'AM' | 'PM') {
+    if (!dateStr) return '';
+    let h = parseInt(hourStr, 10);
+    if (p === 'PM' && h !== 12) h += 12;
+    if (p === 'AM' && h === 12) h = 0;
+    return new Date(`${dateStr}T${h.toString().padStart(2, '0')}:${minuteStr}:00`).toISOString();
+  }
+
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!date || !time) return;
-    const start = new Date(`${date}T${time}:00`);
+    const startIso = buildIso(date, hour, minute, period);
+    if (!startIso) return;
+
+    const start = new Date(startIso);
     const durationMinutes = section === 'ac_family_compartment' ? 24 * 60 : hours * 60;
     const end = new Date(start.getTime() + durationMinutes * 60_000);
+    
     const q = new URLSearchParams({
       product: section,
       from: start.toISOString(),
@@ -39,6 +55,14 @@ export function HomePage() {
     });
     nav(`/book?${q.toString()}`);
   }
+
+  const openPicker = (e: React.MouseEvent<HTMLInputElement>) => {
+    try {
+      (e.target as HTMLInputElement).showPicker?.();
+    } catch {
+      // Ignore if browser doesn't support showPicker
+    }
+  };
 
   return (
     <div className="space-y-16">
@@ -72,27 +96,54 @@ export function HomePage() {
                   <option value="non_ac_space">Non-AC — bunk bed (single space)</option>
                 </select>
               </Field>
+
               <Field label="Check-in date" htmlFor="home-date" required>
                 <input
                   id="home-date"
                   type="date"
-                  className={inputClass}
+                  className={`${inputClass} cursor-pointer`}
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
+                  onClick={openPicker}
                   min={new Date().toISOString().slice(0, 10)}
                   required
                 />
               </Field>
-              <Field label="Check-in time" htmlFor="home-time" required>
-                <input
-                  id="home-time"
-                  type="time"
-                  className={inputClass}
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  required
-                />
+
+              <Field label="Check-in time" required>
+                <div className="flex gap-1.5">
+                  <select
+                    className={`${inputClass} flex-1 px-2 cursor-pointer`}
+                    value={hour}
+                    onChange={(e) => setHour(e.target.value)}
+                    aria-label="Hour"
+                  >
+                    {HOURS.map((h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                  <select
+                    className={`${inputClass} flex-1 px-2 cursor-pointer`}
+                    value={minute}
+                    onChange={(e) => setMinute(e.target.value)}
+                    aria-label="Minute"
+                  >
+                    {MINUTES.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  <select
+                    className={`${inputClass} flex-1 px-2 cursor-pointer`}
+                    value={period}
+                    onChange={(e) => setPeriod(e.target.value as 'AM' | 'PM')}
+                    aria-label="AM/PM"
+                  >
+                    <option value="AM">AM</option>
+                    <option value="PM">PM</option>
+                  </select>
+                </div>
               </Field>
+
               <Field
                 label="Duration (hours)"
                 htmlFor="home-hours"
