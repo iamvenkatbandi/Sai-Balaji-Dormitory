@@ -302,6 +302,15 @@ function BedDrawer({
   const [blocking, setBlocking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // Opens the native picker no matter where inside the field the user clicks
+  const openPicker = (e: React.MouseEvent<HTMLInputElement>) => {
+    try {
+      (e.target as HTMLInputElement).showPicker?.();
+    } catch {
+      // Fallback if showPicker is not supported
+    }
+  };
+
   async function doBlock(e: React.FormEvent) {
     e.preventDefault();
     if (!fromDate || !fromTime || !toDate || !toTime) return;
@@ -395,16 +404,18 @@ function BedDrawer({
                   <div className="flex gap-2">
                     <input
                       type="date"
-                      className={`${inputClass} flex-1`}
+                      className={`${inputClass} flex-1 cursor-pointer`}
                       value={fromDate}
                       onChange={(e) => setFromDate(e.target.value)}
+                      onClick={openPicker}
                       required
                     />
                     <input
                       type="time"
-                      className={`${inputClass} w-32`}
+                      className={`${inputClass} w-32 cursor-pointer`}
                       value={fromTime}
                       onChange={(e) => setFromTime(e.target.value)}
+                      onClick={openPicker}
                       required
                     />
                   </div>
@@ -417,16 +428,18 @@ function BedDrawer({
                   <div className="flex gap-2">
                     <input
                       type="date"
-                      className={`${inputClass} flex-1`}
+                      className={`${inputClass} flex-1 cursor-pointer`}
                       value={toDate}
                       onChange={(e) => setToDate(e.target.value)}
+                      onClick={openPicker}
                       required
                     />
                     <input
                       type="time"
-                      className={`${inputClass} w-32`}
+                      className={`${inputClass} w-32 cursor-pointer`}
                       value={toTime}
                       onChange={(e) => setToTime(e.target.value)}
+                      onClick={openPicker}
                       required
                     />
                   </div>
