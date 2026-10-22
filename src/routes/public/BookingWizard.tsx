@@ -29,6 +29,9 @@ const PRODUCT_LABEL: Record<ProductType, string> = {
   non_ac_space: 'Non-AC sleeping space',
 };
 
+const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
+
 export function BookingWizard() {
   const [params] = useSearchParams();
   const urlProduct = (params.get('product') as ProductType | null) ?? 'ac_individual';
@@ -42,8 +45,17 @@ export function BookingWizard() {
   const [step, setStep] = useState<Step>(urlFrom && urlTo ? 4 : 2);
   const [product, setProduct] = useState<ProductType>(urlProduct);
 
-  const [startDate, setStartDate] = useState(urlFrom ? urlFrom.slice(0, 10) : '');
-  const [startTime, setStartTime] = useState(urlFrom ? urlFrom.slice(11, 16) : '');
+  // Initialize date and time from URL if present
+  const initialDate = urlFrom ? new Date(urlFrom) : null;
+  const initialHour = initialDate ? (initialDate.getHours() % 12 || 12) : 10;
+  const initialMinute = initialDate ? initialDate.getMinutes() : 0;
+  const initialPeriod = initialDate ? (initialDate.getHours() >= 12 ? 'PM' : 'AM') : 'AM';
+
+  const [startDate, setStartDate] = useState(initialDate ? initialDate.toISOString().slice(0, 10) : '');
+  const [startHour, setStartHour] = useState(initialHour.toString().padStart(2, '0'));
+  const [startMinute, setStartMinute] = useState(initialMinute.toString().padStart(2, '0'));
+  const [startPeriod, setStartPeriod] = useState<'AM' | 'PM'>(initialPeriod as 'AM' | 'PM');
+  
   const [hours, setHours] = useState(2);
 
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
@@ -62,10 +74,15 @@ export function BookingWizard() {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [confirmedRow, setConfirmedRow] = useState<BookingStatusRow | null>(null);
 
-  const startsAt = useMemo(
-    () => (startDate && startTime ? new Date(`${startDate}T${startTime}:00`).toISOString() : ''),
-    [startDate, startTime],
-  );
+  // Convert local date & time selections into UTC ISO strings
+  const startsAt = useMemo(() => {
+    if (!startDate) return '';
+    let h = parseInt(startHour, 10);
+    if (startPeriod === 'PM' && h !== 12) h += 12;
+    if (startPeriod === 'AM' && h === 12) h = 0;
+    return new Date(`${startDate}T${h.toString().padStart(2, '0')}:${startMinute}:00`).toISOString();
+  }, [startDate, startHour, startMinute, startPeriod]);
+
   const endsAt = useMemo(
     () => (startsAt ? new Date(new Date(startsAt).getTime() + hours * 3600 * 1000).toISOString() : ''),
     [startsAt, hours],
@@ -85,6 +102,10 @@ export function BookingWizard() {
       .then((q) => setQuote(q))
       .catch((err: Error) => setQuoteError(err.message));
   }, [step, product, startsAt, endsAt]);
+
+  const openPicker = (e: React.MouseEvent<HTMLInputElement>) => {
+    try { (e.target as HTMLInputElement).showPicker?.(); } catch {}
+  };
 
   async function handleCreateHold() {
     setHoldLoading(true);
@@ -167,8 +188,6 @@ export function BookingWizard() {
         },
         modal: {
           ondismiss: () => {
-            // User closed checkout without paying. Hold remains valid
-            // until expires_at; the button re-enables for another attempt.
             setConfirmState('idle');
           },
         },
@@ -265,19 +284,47 @@ export function BookingWizard() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <Field label="Check-in date" htmlFor="wiz-date" required>
                   <input
-                    id="wiz-date" type="date" className={inputClass}
+                    id="wiz-date" 
+                    type="date" 
+                    className={`${inputClass} cursor-pointer`}
                     value={startDate}
                     min={new Date().toISOString().slice(0, 10)}
                     onChange={(e) => setStartDate(e.target.value)}
+                    onClick={openPicker}
+                    required
                   />
                 </Field>
-                <Field label="Check-in time" htmlFor="wiz-time" required>
-                  <input
-                    id="wiz-time" type="time" className={inputClass}
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                  />
+                
+                <Field label="Check-in time" required>
+                  <div className="flex gap-1.5">
+                    <select
+                      className={`${inputClass} flex-1 px-2 cursor-pointer`}
+                      value={startHour}
+                      onChange={(e) => setStartHour(e.target.value)}
+                      aria-label="Hour"
+                    >
+                      {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                    <select
+                      className={`${inputClass} flex-1 px-2 cursor-pointer`}
+                      value={startMinute}
+                      onChange={(e) => setStartMinute(e.target.value)}
+                      aria-label="Minute"
+                    >
+                      {MINUTES.map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                    <select
+                      className={`${inputClass} flex-1 px-2 cursor-pointer`}
+                      value={startPeriod}
+                      onChange={(e) => setStartPeriod(e.target.value as 'AM' | 'PM')}
+                      aria-label="AM/PM"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
                 </Field>
+
                 <Field label="Duration (hours)" htmlFor="wiz-hours" hint={`Minimum ${minHours} hours`} required>
                   <input
                     id="wiz-hours" type="number" min={minHours} step={1}
@@ -291,7 +338,7 @@ export function BookingWizard() {
                 <Button variant="secondary" onClick={() => setStep(1)}>Back</Button>
                 <Button
                   onClick={() => setStep(4)}
-                  disabled={!startDate || !startTime || hours < minHours}
+                  disabled={!startDate || hours < minHours}
                 >
                   Check availability
                 </Button>
