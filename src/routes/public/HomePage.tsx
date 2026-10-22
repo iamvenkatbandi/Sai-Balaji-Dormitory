@@ -55,8 +55,11 @@ export function HomePage() {
             hall, with separate washroom groups and hourly, overnight and extended-stay bookings.
           </p>
 
-          <form onSubmit={onSubmit} className="mt-8 space-y-4 rounded-card border border-line bg-surface p-5 shadow-card">
-            <div className="grid gap-3 sm:grid-cols-2">
+          <form
+            onSubmit={onSubmit}
+            className="mt-8 rounded-card border border-line bg-surface p-6 shadow-card"
+          >
+            <div className="grid gap-5 sm:grid-cols-2">
               <Field label="Accommodation" htmlFor="home-section">
                 <select
                   id="home-section"
@@ -107,9 +110,13 @@ export function HomePage() {
                 />
               </Field>
             </div>
-            <Button type="submit" className="w-full sm:w-auto">Check availability</Button>
+            <div className="mt-6">
+              <Button type="submit" className="w-full">
+                Check availability
+              </Button>
+            </div>
             {!anyRatePublished && plans.status === 'success' && (
-              <p className="text-xs text-muted">
+              <p className="mt-4 text-xs text-muted">
                 Rates are not yet published. You can still check availability; the booking wizard
                 will show enquiry-only options until rates are configured.
               </p>
@@ -117,7 +124,7 @@ export function HomePage() {
           </form>
         </div>
 
-        <PropertyPhoto image={IMAGES.heroAcHall} priority aspectClass="aspect-[16/9]" />
+        <PropertyPhoto image={IMAGES.heroAcHall} priority aspectClass="aspect-[4/3]" />
       </section>
 
       <section className="grid gap-6 md:grid-cols-2">
