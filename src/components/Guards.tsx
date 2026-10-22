@@ -1,13 +1,16 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { getMyPermissions } from '../lib/admin';
 import { Spinner } from './Spinner';
 
-type Role = 'guest' | 'staff' | 'admin';
+export interface AdminOutletContext {
+  permissions: string[];
+}
 
-function Guard({ role, children }: { role: Role; children: ReactNode }) {
-  const [state, setState] = useState<'checking' | 'no-user' | 'user-lacks-role' | 'ok'>('checking');
-  const location = useLocation();
+function useAuthCheck(role: 'guest' | 'staff' | 'admin') {
+  const [state, setState] = useState<'checking' | 'no-user' | 'no-role' | 'ok'>('checking');
+  const [permissions, setPermissions] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -16,11 +19,14 @@ function Guard({ role, children }: { role: Role; children: ReactNode }) {
         const { data: { user } } = await supabase.auth.getUser();
         if (cancelled) return;
         if (!user) { setState('no-user'); return; }
+
         if (role === 'guest') { setState('ok'); return; }
-        // Role tables are populated in Phase 4. Until then, an authenticated
-        // user hitting /staff or /admin sees a clear notice rather than a
-        // redirect loop back to /login.
-        setState('user-lacks-role');
+
+        const perms = await getMyPermissions();
+        if (cancelled) return;
+        if (perms.length === 0) { setState('no-role'); return; }
+        setPermissions(perms);
+        setState('ok');
       } catch {
         if (!cancelled) setState('no-user');
       }
@@ -28,24 +34,49 @@ function Guard({ role, children }: { role: Role; children: ReactNode }) {
     return () => { cancelled = true; };
   }, [role]);
 
+  return { state, permissions };
+}
+
+function AccessPending() {
+  return (
+    <div className="mx-auto max-w-2xl py-16">
+      <h1 className="text-2xl font-semibold text-ink">Access pending</h1>
+      <p className="mt-2 text-sm text-muted">
+        Your account is signed in, but no staff role has been granted yet. Contact the property
+        administrator to request access.
+      </p>
+    </div>
+  );
+}
+
+export function GuestGuard() {
+  const { state } = useAuthCheck('guest');
+  const location = useLocation();
   if (state === 'checking') return <Spinner label="Checking access…" />;
   if (state === 'no-user') {
     return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
   }
-  if (state === 'user-lacks-role') {
-    return (
-      <div className="mx-auto max-w-2xl py-16">
-        <h1 className="text-2xl font-semibold text-ink">Access pending</h1>
-        <p className="mt-2 text-sm text-muted">
-          This section requires a staff or admin role. Role-based access is being configured in Phase 4.
-          Contact the property administrator if you believe you should have access.
-        </p>
-      </div>
-    );
-  }
-  return <>{children}</>;
+  return <Outlet />;
 }
 
-export const GuestGuard = ({ children }: { children: ReactNode }) => <Guard role="guest">{children}</Guard>;
-export const StaffGuard = ({ children }: { children: ReactNode }) => <Guard role="staff">{children}</Guard>;
-export const AdminGuard = ({ children }: { children: ReactNode }) => <Guard role="admin">{children}</Guard>;
+export function AdminGuard() {
+  const { state, permissions } = useAuthCheck('admin');
+  const location = useLocation();
+  if (state === 'checking') return <Spinner label="Loading admin…" />;
+  if (state === 'no-user') {
+    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
+  }
+  if (state === 'no-role') return <AccessPending />;
+  return <Outlet context={{ permissions } satisfies AdminOutletContext} />;
+}
+
+export function StaffGuard({ children }: { children: ReactNode }) {
+  const { state } = useAuthCheck('staff');
+  const location = useLocation();
+  if (state === 'checking') return <Spinner label="Checking access…" />;
+  if (state === 'no-user') {
+    return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
+  }
+  if (state === 'no-role') return <AccessPending />;
+  return <>{children}</>;
+}

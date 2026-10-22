@@ -124,3 +124,69 @@ export interface ExtensionRequest {
   reviewed_by: string | null;
   review_note: string | null;
 }
+
+export interface AdminDashboardMetrics {
+  capacity: { total: number; ac: number; non_ac: number };
+  occupancy: { occupied: number; available: number; reserved: number; maintenance: number; cleaning: number };
+  today: { arrivals: number; departures: number; overdue: number };
+  finance: { collections_paise: number; outstanding_paise: number };
+  ops: { open_support_tickets: number };
+}
+
+export type BedStatus = 'available' | 'reserved' | 'occupied' | 'cleaning' | 'maintenance' | 'inactive';
+
+export interface BedRow {
+  space_id: string;
+  code: string;
+  product_type: ProductType;
+  position: string;
+  section_code: 'AC' | 'NON_AC';
+  zone_name: string;
+  bunk_unit_code: string | null;
+  family_compartment_code: string | null;
+  women_reserved: boolean;
+  is_active: boolean;
+  status: BedStatus;
+  current_booking_id: string | null;
+  current_booking_reference: string | null;
+  current_booking_ends_at: string | null;
+  current_booking_guest_name: string | null;
+  upcoming_booking_id: string | null;
+  upcoming_booking_reference: string | null;
+  upcoming_booking_starts_at: string | null;
+}
+
+export interface BedDetail {
+  space: {
+    id: string; code: string; product_type: ProductType; position: string;
+    section_code: 'AC' | 'NON_AC'; zone_name: string;
+    bunk_unit_code: string | null; family_compartment_code: string | null;
+    women_reserved: boolean; is_active: boolean;
+  };
+  current_booking: {
+    id: string; reference: string; status: BookingStatus;
+    starts_at: string; ends_at: string;
+    guest_name: string | null; guest_gender: GuestGender | null;
+  } | null;
+  upcoming_bookings: Array<{
+    id: string; reference: string; status: BookingStatus;
+    starts_at: string; ends_at: string; guest_name: string | null;
+  }>;
+  maintenance_history: Array<{
+    id: string; kind: string; blocked_from: string; blocked_to: string; reason: string | null;
+  }>;
+  cleaning_history: Array<{ id: string; blocked_from: string; blocked_to: string }>;
+}
+
+export interface AdminBookingRow {
+  id: string;
+  reference: string;
+  status: BookingStatus;
+  product_type: ProductType;
+  starts_at: string;
+  ends_at: string;
+  total_paise: number | null;
+  guest_name: string | null;
+  guest_email: string | null;
+  space_code: string | null;
+}

@@ -1,5 +1,7 @@
-import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { PublicLayout } from './layouts/PublicLayout';
+import { PortalLayout } from './layouts/PortalLayout';
+import { AdminLayout } from './layouts/AdminLayout';
 import { GuestGuard, StaffGuard, AdminGuard } from './components/Guards';
 
 import { HomePage } from './routes/public/HomePage';
@@ -19,7 +21,6 @@ import { LegalPage } from './routes/public/LegalPage';
 import { BookingWizard } from './routes/public/BookingWizard';
 import { NotFoundPage } from './routes/public/NotFoundPage';
 
-import { PortalLayout } from './layouts/PortalLayout';
 import { DashboardPage } from './routes/portal/DashboardPage';
 import { MyBookingsPage } from './routes/portal/MyBookingsPage';
 import { MyBookingDetailPage } from './routes/portal/MyBookingDetailPage';
@@ -30,11 +31,18 @@ import { NewSupportPage } from './routes/portal/NewSupportPage';
 import { SupportTicketPage } from './routes/portal/SupportTicketPage';
 import { ProfilePage } from './routes/portal/ProfilePage';
 
-function PhasePlaceholder({ name, phase }: { name: string; phase: string }) {
+import { AdminDashboardPage } from './routes/admin/DashboardPage';
+import { AdminBedsPage } from './routes/admin/BedsPage';
+import { AdminBookingsPage } from './routes/admin/BookingsPage';
+import { AdminReceptionPage } from './routes/admin/ReceptionPage';
+import { AdminRatesPage } from './routes/admin/RatesPage';
+import { AdminSettingsPage } from './routes/admin/SettingsPage';
+
+function StaffPlaceholder() {
   return (
     <div className="mx-auto max-w-3xl py-16">
-      <h1 className="text-2xl font-semibold text-ink">{name}</h1>
-      <p className="mt-2 text-sm text-muted">This module is delivered in {phase}.</p>
+      <h1 className="text-2xl font-semibold text-ink">Staff operations</h1>
+      <p className="mt-2 text-sm text-muted">See <a href="/admin" className="text-brand-900 underline">/admin</a> for the Control Room.</p>
     </div>
   );
 }
@@ -64,34 +72,44 @@ const router = createBrowserRouter([
   },
   {
     path: '/portal',
-    element: <GuestGuard><PortalLayout /></GuestGuard>,
+    element: <GuestGuard />,
     children: [
-      { index: true, element: <DashboardPage /> },
-      { path: 'bookings', element: <MyBookingsPage /> },
-      { path: 'bookings/:id', element: <MyBookingDetailPage /> },
-      { path: 'accommodation', element: <MyAccommodationPage /> },
-      { path: 'payments', element: <PaymentsPage /> },
-      { path: 'support', element: <SupportListPage /> },
-      { path: 'support/new', element: <NewSupportPage /> },
-      { path: 'support/:id', element: <SupportTicketPage /> },
-      { path: 'profile', element: <ProfilePage /> },
-    ],
-  },
-  {
-    path: '/staff',
-    element: <StaffGuard><Outlet /></StaffGuard>,
-    children: [
-      { index: true, element: <PhasePlaceholder name="Staff operations" phase="Phase 4" /> },
-      { path: '*', element: <PhasePlaceholder name="Staff operations" phase="Phase 4" /> },
+      {
+        element: <PortalLayout />,
+        children: [
+          { index: true, element: <DashboardPage /> },
+          { path: 'bookings', element: <MyBookingsPage /> },
+          { path: 'bookings/:id', element: <MyBookingDetailPage /> },
+          { path: 'accommodation', element: <MyAccommodationPage /> },
+          { path: 'payments', element: <PaymentsPage /> },
+          { path: 'support', element: <SupportListPage /> },
+          { path: 'support/new', element: <NewSupportPage /> },
+          { path: 'support/:id', element: <SupportTicketPage /> },
+          { path: 'profile', element: <ProfilePage /> },
+        ],
+      },
     ],
   },
   {
     path: '/admin',
-    element: <AdminGuard><Outlet /></AdminGuard>,
+    element: <AdminGuard />,
     children: [
-      { index: true, element: <PhasePlaceholder name="Admin Control Room" phase="Phase 4" /> },
-      { path: '*', element: <PhasePlaceholder name="Admin Control Room" phase="Phase 4" /> },
+      {
+        element: <AdminLayout />,
+        children: [
+          { index: true, element: <AdminDashboardPage /> },
+          { path: 'reception', element: <AdminReceptionPage /> },
+          { path: 'beds', element: <AdminBedsPage /> },
+          { path: 'bookings', element: <AdminBookingsPage /> },
+          { path: 'rates', element: <AdminRatesPage /> },
+          { path: 'settings', element: <AdminSettingsPage /> },
+        ],
+      },
     ],
+  },
+  {
+    path: '/staff',
+    element: <StaffGuard><StaffPlaceholder /></StaffGuard>,
   },
 ]);
 
