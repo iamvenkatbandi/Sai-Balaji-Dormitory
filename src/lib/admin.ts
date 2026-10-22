@@ -13,10 +13,14 @@ async function rpcError(err: unknown): Promise<Error> {
   return new Error('An unexpected error occurred.');
 }
 
-export async function getMyPermissions(): Promise<string[]> {
+export async function getMyPermissions(): Promise<{ permissions: string[]; error: Error | null }> {
   const { data, error } = await supabase.rpc('my_permissions');
-  if (error) return [];
-  return (data as string[]) ?? [];
+  if (error) {
+    const message = (error as { message?: string }).message ?? String(error);
+    return { permissions: [], error: new Error(message) };
+  }
+  const perms = Array.isArray(data) ? (data as string[]) : [];
+  return { permissions: perms, error: null };
 }
 
 export async function getDashboardMetrics(): Promise<AdminDashboardMetrics> {
