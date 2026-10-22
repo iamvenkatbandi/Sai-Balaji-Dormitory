@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useAsync } from '../../lib/useAsync';
-import {
-  getBedsStatus, getBedDetail, blockBed, releaseBlock,
-} from '../../lib/admin';
+import { getBedsStatus, getBedDetail, blockBed, releaseBlock } from '../../lib/admin';
 import type { AdminOutletContext } from '../../components/Guards';
 import { PageHeader } from '../../components/PageHeader';
 import { Spinner } from '../../components/Spinner';
@@ -11,11 +9,27 @@ import { ErrorState } from '../../components/ErrorState';
 import { EmptyState } from '../../components/EmptyState';
 import { Button } from '../../components/Button';
 import { Field, inputClass } from '../../components/Field';
-import { StatusChip } from '../../components/StatusChip';
 import { formatDateTime } from '../../lib/format';
 import type { BedDetail, BedRow, BedStatus } from '../../lib/database.types';
 
-const STATUSES: Array<BedStatus | 'all'> = ['all','available','reserved','occupied','cleaning','maintenance','inactive'];
+const STATUS_STYLE: Record<BedStatus, { fill: string; border: string; text: string; pillow: string; label: string }> = {
+  available:   { fill: '#E6F4ED', border: '#2E7D5B', text: '#2E7D5B', pillow: '#C8E6D5', label: 'Available' },
+  reserved:    { fill: '#FBF0DC', border: '#8A5A00', text: '#8A5A00', pillow: '#F0DAB0', label: 'Reserved' },
+  occupied:    { fill: '#DCE6E2', border: '#173B35', text: '#173B35', pillow: '#B5C5BE', label: 'Occupied' },
+  cleaning:    { fill: '#EDEAF7', border: '#5B4A8F', text: '#5B4A8F', pillow: '#D5CEE8', label: 'Cleaning' },
+  maintenance: { fill: '#FBEAE8', border: '#B3261E', text: '#B3261E', pillow: '#F0C9C4', label: 'Maintenance' },
+  inactive:    { fill: '#EFF1EF', border: '#69736D', text: '#69736D', pillow: '#D8DCD8', label: 'Inactive' },
+};
+
+const FILTER_OPTIONS: Array<{ value: BedStatus | 'all'; label: string }> = [
+  { value: 'all', label: 'All' },
+  { value: 'available', label: 'Available' },
+  { value: 'reserved', label: 'Reserved' },
+  { value: 'occupied', label: 'Occupied' },
+  { value: 'cleaning', label: 'Cleaning' },
+  { value: 'maintenance', label: 'Maintenance' },
+  { value: 'inactive', label: 'Inactive' },
+];
 
 export function AdminBedsPage() {
   const { permissions } = useOutletContext<AdminOutletContext>();
@@ -26,102 +40,164 @@ export function AdminBedsPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
 
-  const beds = useAsync(
-    () => getBedsStatus({
-      section,
-      status: status === 'all' ? null : status,
-      search: search.trim() || null,
-    }),
-    [section, status, search],
-  );
+  const beds = useAsync(() => getBedsStatus({ section }), [section]);
+
+  const filtered = useMemo(() => {
+    if (beds.status !== 'success') return [] as BedRow[];
+    let rows = beds.data;
+    if (status !== 'all') rows = rows.filter((r) => r.status === status);
+    const q = search.trim().toLowerCase();
+    if (q) rows = rows.filter((r) => r.code.toLowerCase().includes(q));
+    return rows;
+  }, [beds.status === 'success' ? beds.data : null, status, search]);
+
+  const counts = useMemo(() => {
+    const c: Record<BedStatus, number> = {
+      available: 0, reserved: 0, occupied: 0,
+      cleaning: 0, maintenance: 0, inactive: 0,
+    };
+    if (beds.status === 'success') for (const r of beds.data) c[r.status]++;
+    return c;
+  }, [beds.status === 'success' ? beds.data : null]);
 
   const grouped = useMemo(() => {
-    if (beds.status !== 'success') return { units: [], individual: [] as BedRow[] };
     if (section === 'NON_AC') {
       const map = new Map<string, { unitCode: string; spaces: BedRow[] }>();
-      for (const row of beds.data) {
+      for (const row of filtered) {
         const key = row.bunk_unit_code ?? 'unknown';
         if (!map.has(key)) map.set(key, { unitCode: key, spaces: [] });
         map.get(key)!.spaces.push(row);
       }
-      const units = Array.from(map.values()).sort((a, b) => a.unitCode.localeCompare(b.unitCode));
-      return { units, individual: [] as BedRow[] };
+      return {
+        units: Array.from(map.values()).sort((a, b) => a.unitCode.localeCompare(b.unitCode)),
+        individual: [] as BedRow[],
+      };
     }
-    return { units: [], individual: [...beds.data].sort((a, b) => a.code.localeCompare(b.code)) };
-  }, [beds.status === 'success' ? beds.data : null, section]);
+    return {
+      units: [] as { unitCode: string; spaces: BedRow[] }[],
+      individual: [...filtered].sort((a, b) => a.code.localeCompare(b.code)),
+    };
+  }, [filtered, section]);
 
   return (
     <>
-      <PageHeader eyebrow="Inventory" title="Bed inventory" intro="Live status of every sleeping space. Click any bed for details and actions." />
+      <PageHeader
+        eyebrow="Inventory"
+        title="Bed inventory"
+        intro="Live seat-map view of every sleeping space. Click a bed for details and actions."
+      />
 
-      <div className="mb-4 flex flex-wrap gap-3">
-        <div className="flex rounded-input border border-line bg-surface">
-          <button onClick={() => setSection('AC')}
-            className={`px-4 py-2 text-sm ${section === 'AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'} rounded-l-input`}>
-            AC Hall
-          </button>
-          <button onClick={() => setSection('NON_AC')}
-            className={`px-4 py-2 text-sm ${section === 'NON_AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'} rounded-r-input`}>
-            Non-AC Hall
-          </button>
+      <div className="mb-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-input border border-line bg-surface">
+            <button
+              onClick={() => setSection('AC')}
+              className={`rounded-l-input px-4 py-2 text-sm ${
+                section === 'AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'
+              }`}
+            >
+              AC Hall
+            </button>
+            <button
+              onClick={() => setSection('NON_AC')}
+              className={`rounded-r-input px-4 py-2 text-sm ${
+                section === 'NON_AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'
+              }`}
+            >
+              Non-AC Hall
+            </button>
+          </div>
+
+          <input
+            className={`${inputClass} max-w-xs`}
+            placeholder="Search bed ID"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Search bed ID"
+          />
         </div>
-        <select
-          className={`${inputClass} w-auto`}
-          value={status}
-          onChange={(e) => setStatus(e.target.value as any)}
-          aria-label="Status filter"
-        >
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>{s === 'all' ? 'All statuses' : s[0].toUpperCase() + s.slice(1)}</option>
-          ))}
-        </select>
-        <input
-          className={`${inputClass} w-auto`}
-          placeholder="Search bed ID"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search bed ID"
-        />
+
+        <div className="flex flex-wrap gap-1.5">
+          {FILTER_OPTIONS.map((opt) => {
+            const active = status === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setStatus(opt.value)}
+                aria-pressed={active}
+                className={`rounded-full border px-3 py-1 text-xs ${
+                  active
+                    ? 'border-brand-900 bg-brand-900 text-white'
+                    : 'border-line bg-surface text-ink hover:bg-bg'
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {beds.status === 'success' && (
+        <div className="mb-4 rounded-card border border-line bg-surface p-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+            {(['available', 'occupied', 'reserved', 'cleaning', 'maintenance', 'inactive'] as BedStatus[]).map((s) => (
+              <span key={s} className="inline-flex items-center gap-1.5">
+                <span
+                  className="inline-block h-3 w-3 rounded border"
+                  style={{ background: STATUS_STYLE[s].fill, borderColor: STATUS_STYLE[s].border }}
+                />
+                <span className="tabular-nums text-ink">{counts[s]}</span>
+                <span className="text-muted">{STATUS_STYLE[s].label}</span>
+              </span>
+            ))}
+            <span className="inline-flex items-center gap-1.5">
+              <span className="grid h-3.5 w-3.5 place-items-center rounded-full bg-[#B3261E] text-[8px] font-bold text-white">
+                W
+              </span>
+              <span className="text-muted">Women-reserved</span>
+            </span>
+            <span className="ml-auto text-muted">
+              Showing <span className="tabular-nums text-ink">{filtered.length}</span>{' '}
+              of <span className="tabular-nums text-ink">{beds.data.length}</span>
+            </span>
+          </div>
+        </div>
+      )}
 
       {beds.status === 'loading' && <Spinner />}
       {beds.status === 'error' && <ErrorState message={beds.error.message} />}
-      {beds.status === 'success' && beds.data.length === 0 && (
-        <EmptyState title="No beds match these filters." body="Adjust the section, status or search to see inventory." />
+      {beds.status === 'success' && filtered.length === 0 && (
+        <EmptyState
+          title="No beds match these filters."
+          body="Adjust the section, status or search to see inventory."
+        />
       )}
 
       {beds.status === 'success' && section === 'AC' && grouped.individual.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {grouped.individual.map((row) => (
-            <button key={row.space_id}
-              onClick={() => setSelected(row.space_id)}
-              className="rounded-input border border-line bg-surface p-3 text-left hover:bg-bg">
-              <p className="font-mono text-xs text-ink">{row.code}</p>
-              <div className="mt-1"><StatusChip status={row.status} /></div>
-            </button>
-          ))}
+        <div className="rounded-card border border-line bg-bg p-4">
+          <div className="grid grid-cols-4 justify-items-center gap-x-3 gap-y-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
+            {grouped.individual.map((row) => (
+              <BedTile
+                key={row.space_id}
+                row={row}
+                onClick={() => setSelected(row.space_id)}
+              />
+            ))}
+          </div>
         </div>
       )}
 
       {beds.status === 'success' && section === 'NON_AC' && grouped.units.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {grouped.units.map((unit) => {
-            const upper = unit.spaces.find((s) => s.position === 'upper');
-            const lower = unit.spaces.find((s) => s.position === 'lower');
-            return (
-              <div key={unit.unitCode} className="rounded-card border border-line bg-surface p-3">
-                <p className="mb-2 font-mono text-xs text-muted">{unit.unitCode}</p>
-                {[upper, lower].filter(Boolean).map((row) => row && (
-                  <button key={row.space_id}
-                    onClick={() => setSelected(row.space_id)}
-                    className="mb-1 flex w-full items-center justify-between rounded-md border border-line px-2 py-1.5 text-left hover:bg-bg">
-                    <span className="font-mono text-xs text-ink">{row.code}</span>
-                    <StatusChip status={row.status} />
-                  </button>
-                ))}
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-2 justify-items-center gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          {grouped.units.map((unit) => (
+            <BunkUnit
+              key={unit.unitCode}
+              unitCode={unit.unitCode}
+              spaces={unit.spaces}
+              onSelect={setSelected}
+            />
+          ))}
         </div>
       )}
 
@@ -137,8 +213,90 @@ export function AdminBedsPage() {
   );
 }
 
-function BedDrawer({ spaceId, canBlock, onClose, onChanged }: {
-  spaceId: string; canBlock: boolean; onClose: () => void; onChanged: () => void;
+function BedTile({ row, onClick }: { row: BedRow; onClick: () => void }) {
+  const s = STATUS_STYLE[row.status];
+  const title = `${row.code} — ${s.label}${row.current_booking_reference ? ` · ${row.current_booking_reference}` : ''}${row.women_reserved ? ' · women-reserved' : ''}`;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className="group flex flex-col items-center focus:outline-none"
+    >
+      <div
+        className="relative rounded-lg border-2 transition-transform group-hover:scale-105 group-focus-visible:ring-2 group-focus-visible:ring-brand-900 group-focus-visible:ring-offset-2"
+        style={{ width: 52, height: 88, background: s.fill, borderColor: s.border }}
+      >
+        <div
+          className="absolute rounded"
+          style={{ top: 5, left: 5, right: 5, height: 16, background: s.pillow }}
+        />
+        {row.women_reserved && (
+          <span
+            className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full text-[9px] font-bold text-white shadow"
+            style={{ background: '#B3261E' }}
+            aria-hidden
+          >
+            W
+          </span>
+        )}
+      </div>
+      <span className="mt-1 font-mono text-[10px] leading-tight" style={{ color: s.text }}>
+        {row.code}
+      </span>
+    </button>
+  );
+}
+
+function BunkUnit({
+  unitCode, spaces, onSelect,
+}: {
+  unitCode: string;
+  spaces: BedRow[];
+  onSelect: (id: string) => void;
+}) {
+  const upper = spaces.find((s) => s.position === 'upper');
+  const lower = spaces.find((s) => s.position === 'lower');
+
+  return (
+    <div className="flex flex-col items-center rounded-card border border-line bg-surface p-2">
+      <span className="mb-1 font-mono text-[10px] text-muted">{unitCode}</span>
+      {upper ? (
+        <BedTile row={upper} onClick={() => onSelect(upper.space_id)} />
+      ) : (
+        <div className="flex flex-col items-center opacity-25">
+          <div
+            className="rounded-lg border border-dashed border-line"
+            style={{ width: 52, height: 88 }}
+          />
+          <span className="mt-1 text-[10px] text-muted">—</span>
+        </div>
+      )}
+      <div className="my-1 h-px w-10 bg-line" />
+      {lower ? (
+        <BedTile row={lower} onClick={() => onSelect(lower.space_id)} />
+      ) : (
+        <div className="flex flex-col items-center opacity-25">
+          <div
+            className="rounded-lg border border-dashed border-line"
+            style={{ width: 52, height: 88 }}
+          />
+          <span className="mt-1 text-[10px] text-muted">—</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BedDrawer({
+  spaceId, canBlock, onClose, onChanged,
+}: {
+  spaceId: string;
+  canBlock: boolean;
+  onClose: () => void;
+  onChanged: () => void;
 }) {
   const detail = useAsync(() => getBedDetail(spaceId), [spaceId]);
 
@@ -151,9 +309,15 @@ function BedDrawer({ spaceId, canBlock, onClose, onChanged }: {
   async function doBlock(e: React.FormEvent) {
     e.preventDefault();
     if (!from || !to) return;
-    setBlocking(true); setErr(null);
+    setBlocking(true);
+    setErr(null);
     try {
-      await blockBed(spaceId, new Date(from).toISOString(), new Date(to).toISOString(), reason || 'Maintenance');
+      await blockBed(
+        spaceId,
+        new Date(from).toISOString(),
+        new Date(to).toISOString(),
+        reason || 'Maintenance',
+      );
       onChanged();
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : 'Block failed');
@@ -163,7 +327,8 @@ function BedDrawer({ spaceId, canBlock, onClose, onChanged }: {
   }
 
   async function doRelease(blockId: string) {
-    setBlocking(true); setErr(null);
+    setBlocking(true);
+    setErr(null);
     try {
       await releaseBlock(blockId);
       onChanged();
@@ -175,11 +340,21 @@ function BedDrawer({ spaceId, canBlock, onClose, onChanged }: {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/30" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="h-full w-full max-w-md overflow-y-auto bg-surface shadow-overlay" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-40 flex justify-end bg-black/30"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div
+        className="h-full w-full max-w-md overflow-y-auto bg-surface shadow-overlay"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between border-b border-line p-4">
           <h2 className="text-base font-semibold text-ink">Bed details</h2>
-          <button onClick={onClose} className="rounded-input px-2 py-1 text-sm text-muted hover:bg-bg">Close</button>
+          <button onClick={onClose} className="rounded-input px-2 py-1 text-sm text-muted hover:bg-bg">
+            Close
+          </button>
         </div>
         <div className="p-4">
           {detail.status === 'loading' && <Spinner />}
@@ -192,18 +367,37 @@ function BedDrawer({ spaceId, canBlock, onClose, onChanged }: {
               <form onSubmit={doBlock} className="mt-3 space-y-3">
                 <div className="grid gap-2 sm:grid-cols-2">
                   <Field label="From" htmlFor="blk-from" required>
-                    <input id="blk-from" type="datetime-local" className={inputClass}
-                      value={from} onChange={(e) => setFrom(e.target.value)} required />
+                    <input
+                      id="blk-from"
+                      type="datetime-local"
+                      className={inputClass}
+                      value={from}
+                      onChange={(e) => setFrom(e.target.value)}
+                      required
+                    />
                   </Field>
                   <Field label="To" htmlFor="blk-to" required>
-                    <input id="blk-to" type="datetime-local" className={inputClass}
-                      value={to} onChange={(e) => setTo(e.target.value)} required />
+                    <input
+                      id="blk-to"
+                      type="datetime-local"
+                      className={inputClass}
+                      value={to}
+                      onChange={(e) => setTo(e.target.value)}
+                      required
+                    />
                   </Field>
                 </div>
                 <Field label="Reason" htmlFor="blk-reason">
-                  <input id="blk-reason" className={inputClass} value={reason} onChange={(e) => setReason(e.target.value)} />
+                  <input
+                    id="blk-reason"
+                    className={inputClass}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                  />
                 </Field>
-                <Button type="submit" loading={blocking}>Create block</Button>
+                <Button type="submit" loading={blocking}>
+                  Create block
+                </Button>
                 {err && <p role="alert" className="text-sm text-[#B3261E]">{err}</p>}
               </form>
 
@@ -214,10 +408,17 @@ function BedDrawer({ spaceId, canBlock, onClose, onChanged }: {
                     {detail.data.maintenance_history.map((b) => (
                       <li key={b.id} className="flex items-center justify-between rounded-input border border-line p-2">
                         <div>
-                          <p className="text-ink">{formatDateTime(b.blocked_from)} → {formatDateTime(b.blocked_to)}</p>
+                          <p className="text-ink">
+                            {formatDateTime(b.blocked_from)} → {formatDateTime(b.blocked_to)}
+                          </p>
                           {b.reason && <p className="text-xs text-muted">{b.reason}</p>}
                         </div>
-                        <button onClick={() => doRelease(b.id)} className="text-xs text-brand-900 hover:underline">Release</button>
+                        <button
+                          onClick={() => doRelease(b.id)}
+                          className="text-xs text-brand-900 hover:underline"
+                        >
+                          Release
+                        </button>
                       </li>
                     ))}
                   </ul>
