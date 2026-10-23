@@ -31,13 +31,9 @@ function useAuthCheck(role: 'guest' | 'staff' | 'admin'): CheckState {
           return;
         }
 
-        const { permissions, error } = await getMyPermissions();
+        const permissions = await getMyPermissions();
         if (cancelled) return;
 
-        if (error) {
-          setState({ kind: 'rpc-error', message: error.message });
-          return;
-        }
         if (permissions.length === 0) {
           setState({ kind: 'no-role' });
           return;

@@ -4,7 +4,6 @@ import { useAsync } from '../../lib/useAsync';
 import {
   getBedsStatus, getBedDetail, blockBed, releaseBlock,
   proposeWomenReserved, applyWomenReserved, revokeWomenReserved,
-  type ProposedSpace,
 } from '../../lib/admin';
 import type { AdminOutletContext } from '../../components/Guards';
 import { PageHeader } from '../../components/PageHeader';
@@ -14,7 +13,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Button } from '../../components/Button';
 import { inputClass } from '../../components/Field';
 import { formatDateTime } from '../../lib/format';
-import type { BedDetail, BedRow, BedStatus } from '../../lib/database.types';
+import type { BedDetail, BedRow, BedStatus, ProposedSpace } from '../../lib/database.types';
 
 const STATUS_STYLE: Record<BedStatus, { fill: string; border: string; text: string; pillow: string; label: string }> = {
   available:   { fill: '#E6F4ED', border: '#2E7D5B', text: '#2E7D5B', pillow: '#C8E6D5', label: 'Available' },

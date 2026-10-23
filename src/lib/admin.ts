@@ -18,7 +18,7 @@ async function rpcError(err: unknown): Promise<Error> {
 
 export async function getMyPermissions(): Promise<string[]> {
   const { data, error } = await supabase.rpc('my_permissions');
-  if (error) return [];
+  if (error) throw await rpcError(error);
   return (data as string[]) ?? [];
 }
 
