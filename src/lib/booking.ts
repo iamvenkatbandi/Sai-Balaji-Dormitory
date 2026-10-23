@@ -27,6 +27,7 @@ export interface HoldSuccess {
 export interface HoldFailure {
   ok: false;
   error: string;
+  detail?: string;
 }
 
 export type HoldResponse = HoldSuccess | HoldFailure;

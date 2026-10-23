@@ -107,7 +107,7 @@ export function BookingWizard() {
     try { (e.target as HTMLInputElement).showPicker?.(); } catch {}
   };
 
-  async function handleCreateHold() {
+    async function handleCreateHold() {
     setHoldLoading(true);
     setHoldError(null);
     try {
@@ -117,7 +117,11 @@ export function BookingWizard() {
         contactEmail,
         contactPhone: contactPhone || null,
       });
-      if (!res.ok) { setHoldError(res.error); return; }
+      if (!res.ok) { 
+        // Show detail if available, otherwise the error code
+        setHoldError(res.detail ? `${res.error}: ${res.detail}` : res.error); 
+        return; 
+      }
       setHold(res);
       setStep(7);
     } catch (err) {
