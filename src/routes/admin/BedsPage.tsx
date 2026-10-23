@@ -166,7 +166,7 @@ export function AdminBedsPage() {
 
       {/* ─── FLOOR PLAN LAYOUT ─────────────────────────────────────── */}
       {filtered.length > 0 && (
-        <div className="relative mx-auto w-full max-w-[1500px] rounded-xl border-2 border-dashed border-gray-400 bg-gray-50 p-6 sm:p-10 shadow-inner">
+        <div className="relative mx-auto w-full max-w-full rounded-xl border-2 border-dashed border-gray-400 bg-gray-50 p-4 sm:p-6 shadow-inner">
           
           {/* Entrance */}
           <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
@@ -176,57 +176,59 @@ export function AdminBedsPage() {
             <div className="h-4 w-24 bg-gradient-to-b from-gray-200 to-transparent opacity-50" />
           </div>
 
-          <div className="flex w-full gap-4 sm:gap-8 items-stretch justify-center mt-6 overflow-x-auto pb-4">
+          <div className="flex w-full gap-2 sm:gap-4 items-stretch justify-center mt-6 pb-2">
             
             {/* Washroom Block A (Left) */}
             <Link 
               to="/admin/washrooms" 
-              className="hidden w-20 flex-col items-center justify-center rounded-lg border-2 border-[#2E7D5B] bg-[#E6F4ED] p-2 hover:scale-[1.02] transition-transform lg:flex shrink-0"
+              className="hidden w-16 lg:flex flex-col items-center justify-center rounded-lg border-2 border-[#2E7D5B] bg-[#E6F4ED] p-1 hover:scale-[1.02] transition-transform shrink-0"
             >
-              <span className="text-3xl mb-2">🚽</span>
-              <span className="text-[10px] font-bold uppercase text-[#2E7D5B] text-center leading-tight">Washroom<br/>Block A</span>
-              <span className="mt-2 text-[9px] text-[#2E7D5B]">Manage →</span>
+              <span className="text-2xl mb-1">🚽</span>
+              <span className="text-[9px] font-bold uppercase text-[#2E7D5B] text-center leading-tight">Washroom<br/>Block A</span>
             </Link>
 
             {/* Center Grid */}
-            <div className="flex-1 rounded-lg bg-white p-4 shadow-sm border border-gray-200 min-w-max">
-              <div className="mb-3 flex justify-between items-center text-[10px] text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
+            <div className="flex-1 rounded-lg bg-white p-2 sm:p-4 shadow-sm border border-gray-200 min-w-0">
+              <div className="mb-2 flex justify-between items-center text-[9px] text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-1">
                 <span>{section === 'AC' ? 'AC Hall Area' : 'Non-AC Hall Area'}</span>
                 <span>{filtered.length} Spaces</span>
               </div>
 
-              <div className="flex items-stretch gap-4 sm:gap-12 w-full max-w-fit mx-auto">
+              <div className="flex items-stretch gap-3 sm:gap-6 w-full mx-auto">
                 {/* Left Side Grid */}
-                <FloorPlanSide 
-                  items={leftItems} 
-                  isBunk={section === 'NON_AC'} 
-                  onSelect={setSelected} 
-                />
+                <div className="flex-1 min-w-0">
+                  <FloorPlanSide 
+                    items={leftItems} 
+                    isBunk={section === 'NON_AC'} 
+                    onSelect={setSelected} 
+                  />
+                </div>
 
                 {/* Center Aisle */}
-                <div className="w-12 sm:w-20 bg-gray-100 rounded-md flex flex-col items-center justify-center border-x-2 border-dashed border-gray-300 shrink-0">
-                  <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest rotate-[-90deg] whitespace-nowrap">
-                    Central Walkway
+                <div className="w-8 sm:w-12 bg-gray-100 rounded-md flex flex-col items-center justify-center border-x border-dashed border-gray-300 shrink-0">
+                  <span className="text-gray-400 text-[9px] font-bold uppercase tracking-widest rotate-[-90deg] whitespace-nowrap">
+                    Walkway
                   </span>
                 </div>
 
                 {/* Right Side Grid */}
-                <FloorPlanSide 
-                  items={rightItems} 
-                  isBunk={section === 'NON_AC'} 
-                  onSelect={setSelected} 
-                />
+                <div className="flex-1 min-w-0">
+                  <FloorPlanSide 
+                    items={rightItems} 
+                    isBunk={section === 'NON_AC'} 
+                    onSelect={setSelected} 
+                  />
+                </div>
               </div>
             </div>
 
             {/* Washroom Block B (Right) */}
             <Link 
               to="/admin/washrooms" 
-              className="hidden w-20 flex-col items-center justify-center rounded-lg border-2 border-[#2E7D5B] bg-[#E6F4ED] p-2 hover:scale-[1.02] transition-transform lg:flex shrink-0"
+              className="hidden w-16 lg:flex flex-col items-center justify-center rounded-lg border-2 border-[#2E7D5B] bg-[#E6F4ED] p-1 hover:scale-[1.02] transition-transform shrink-0"
             >
-              <span className="text-3xl mb-2">🚿</span>
-              <span className="text-[10px] font-bold uppercase text-[#2E7D5B] text-center leading-tight">Washroom<br/>Block B</span>
-              <span className="mt-2 text-[9px] text-[#2E7D5B]">Manage →</span>
+              <span className="text-2xl mb-1">🚿</span>
+              <span className="text-[9px] font-bold uppercase text-[#2E7D5B] text-center leading-tight">Washroom<br/>Block B</span>
             </Link>
 
           </div>
@@ -275,19 +277,16 @@ function FloorPlanSide({ items, isBunk, onSelect }: {
   }
 
   return (
-    <div className="flex flex-col gap-2 sm:gap-3">
+    <div className="flex flex-col gap-1.5 w-full">
       {grid.map((row, rIdx) => (
         <div 
           key={rIdx} 
           // Adds a horizontal walkway after every 2 rows
-          className={`flex gap-2 sm:gap-3 ${rIdx > 0 && rIdx % 2 === 0 ? 'mt-6 sm:mt-8' : ''}`}
+          className={`flex gap-1.5 w-full ${rIdx > 0 && rIdx % 2 === 0 ? 'mt-4 sm:mt-6' : ''}`}
         >
           {row.map((item, cIdx) => (
-            <div 
-              key={cIdx} 
-              // Adds a vertical walkway after every 2 columns
-              className={`${cIdx > 0 && cIdx % 2 === 0 ? 'ml-6 sm:ml-8' : ''}`}
-            >
+            // Removed the vertical gap between columns (ml-6)
+            <div key={cIdx} className="flex-1 min-w-0">
               {isBunk ? (
                 <CompactBunk unitCode={item.unitCode} spaces={item.spaces} onSelect={onSelect} />
               ) : (
@@ -312,11 +311,11 @@ function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) 
       type="button" 
       onClick={onClick} 
       title={title} 
-      className="group relative flex h-[60px] w-[56px] flex-col items-center justify-between rounded border-2 py-1 transition-transform hover:scale-105 hover:z-10 hover:shadow-md focus:outline-none" 
+      className="group relative flex h-[50px] w-full min-w-0 flex-col items-center justify-between rounded border-2 py-1 transition-transform hover:scale-105 hover:z-10 hover:shadow-md focus:outline-none" 
       style={{ background: s.fill, borderColor: s.border }}
     >
       <div className="h-1.5 w-3/4 rounded-full opacity-60" style={{ background: s.pillow }} />
-      <span className="font-mono text-[9px] font-bold tracking-tight" style={{ color: s.text }}>{displayCode}</span>
+      <span className="font-mono text-[9px] font-bold tracking-tight truncate w-full text-center px-0.5" style={{ color: s.text }}>{displayCode}</span>
       {row.women_reserved && <span className="absolute -right-1.5 -top-1.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-[#B3261E] text-[7px] font-bold text-white shadow">W</span>}
     </button>
   );
@@ -327,11 +326,11 @@ function CompactBunk({ unitCode, spaces, onSelect }: { unitCode: string; spaces:
   const lower = spaces.find((s) => s.position === 'lower');
   
   return (
-    <div className="flex flex-col items-center w-[44px]">
-      {upper ? <CompactBunkCell row={upper} letter="U" onClick={() => onSelect(upper.space_id)} /> : <div className="h-6 w-full rounded-sm border border-dashed border-line opacity-25" />}
+    <div className="flex flex-col items-center w-full min-w-0">
+      {upper ? <CompactBunkCell row={upper} letter="U" onClick={() => onSelect(upper.space_id)} /> : <div className="h-5 w-full rounded-sm border border-dashed border-line opacity-25" />}
       <div className="h-0.5" />
-      {lower ? <CompactBunkCell row={lower} letter="L" onClick={() => onSelect(lower.space_id)} /> : <div className="h-6 w-full rounded-sm border border-dashed border-line opacity-25" />}
-      <span className="mt-1 font-mono text-[8px] font-medium text-muted">{unitCode.replace('NA-', '')}</span>
+      {lower ? <CompactBunkCell row={lower} letter="L" onClick={() => onSelect(lower.space_id)} /> : <div className="h-5 w-full rounded-sm border border-dashed border-line opacity-25" />}
+      <span className="mt-0.5 font-mono text-[8px] font-medium text-muted w-full text-center truncate">{unitCode.replace('NA-', '')}</span>
     </div>
   );
 }
@@ -342,7 +341,7 @@ function CompactBunkCell({ row, letter, onClick }: { row: BedRow; letter: 'U' | 
     <button 
       type="button" 
       onClick={onClick} 
-      className="group relative flex h-6 w-full items-center justify-between rounded-sm border px-1 transition-transform hover:scale-110 hover:z-10 hover:shadow-md" 
+      className="group relative flex h-[22px] w-full min-w-0 items-center justify-between rounded-sm border px-1 transition-transform hover:scale-110 hover:z-10 hover:shadow-md" 
       style={{ background: s.fill, borderColor: s.border, color: s.text }}
     >
       <span className="text-[9px] font-bold">{letter}</span>
