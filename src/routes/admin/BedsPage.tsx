@@ -5,7 +5,7 @@ import {
   getBedsStatus, getBedDetail, blockBed, releaseBlock,
   proposeWomenReserved, applyWomenReserved, assignBedManual,
   transferBooking, toggleBedActive, checkInBooking,
-  getUnassignedBookings, cancelBookingAdmin // <-- Added import
+  getUnassignedBookings, cancelBookingAdmin
 } from '../../lib/admin';
 import { supabase } from '../../lib/supabase';
 import type { AdminOutletContext } from '../../components/Guards';
@@ -499,7 +499,7 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
                         <Button 
                           onClick={handleCancelReservation} 
                           loading={cancelling} 
-                          className="w-full sm:w-auto bg-white text-[#B3261E] border border-[#FBEAE8] hover:bg-[#FBEAE8]"
+                          className="w-full sm:w-auto bg-[#FBEAE8] text-[#B3261E] border border-[#FBEAE8] hover:bg-[#F0C9C4] hover:border-[#F0C9C4]"
                         >
                           Cancel Reservation
                         </Button>
