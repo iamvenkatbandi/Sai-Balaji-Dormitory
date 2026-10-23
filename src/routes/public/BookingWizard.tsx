@@ -107,7 +107,6 @@ export function BookingWizard() {
     if (step !== 5 || !startsAt || !endsAt) return;
     setBedMap(null); setBedMapError(null);
     
-    // We need to fetch for AC or NON_AC based on the product type
     const section = product === 'non_ac_space' ? 'NON_AC' : 'AC';
     
     getPublicBedMap(section, startsAt, endsAt)
@@ -123,6 +122,7 @@ export function BookingWizard() {
         guestName, guestGender,
         contactEmail,
         contactPhone,
+        preferredSpaceId: selectedSpaceId, // Pass the selected bed
       });
       if (!res.ok) { setHoldError(res.detail ? `${res.error}: ${res.detail}` : res.error); return; }
       setHold(res);
@@ -242,7 +242,19 @@ export function BookingWizard() {
                   </select>
                 </Field>
                 <Field label="Contact email" htmlFor="wiz-email" required><input id="wiz-email" type="email" className={inputClass} value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} /></Field>
-                <Field label="Contact phone" htmlFor="wiz-phone" required><input id="wiz-phone" type="tel" className={inputClass} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} /></Field>
+                
+                {/* PHONE NUMBER FIX: Only numbers allowed */}
+                <Field label="Contact phone" htmlFor="wiz-phone" required>
+                  <input 
+                    id="wiz-phone" 
+                    type="tel" 
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className={inputClass} 
+                    value={contactPhone} 
+                    onChange={(e) => setContactPhone(e.target.value.replace(/[^0-9]/g, ''))} 
+                  />
+                </Field>
               </div>
               <div className="mt-6 flex justify-between"><Button variant="secondary" onClick={() => setStep(2)}>Back</Button><Button onClick={() => setStep(4)} disabled={!guestName.trim() || !contactEmail.trim() || !contactPhone.trim()}>Continue</Button></div>
             </SectionCard>
@@ -266,7 +278,7 @@ export function BookingWizard() {
             </SectionCard>
           )}
 
-          {/* NEW STEP 5: SELECT BED */}
+          {/* STEP 5: SELECT BED */}
           {step === 5 && (
             <SectionCard title="Select your bed" subtitle="Click an available bed below. (Note: Your bed is not locked until payment succeeds).">
               {bedMapError && <ErrorState message={bedMapError} onRetry={() => setStep(4)} />}
