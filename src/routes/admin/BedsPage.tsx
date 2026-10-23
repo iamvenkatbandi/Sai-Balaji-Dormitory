@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, Link } from 'react-router-dom';
 import { useAsync } from '../../lib/useAsync';
 import {
   getBedsStatus, getBedDetail, blockBed, releaseBlock,
@@ -37,9 +37,6 @@ const FILTER_OPTIONS: Array<{ value: BedStatus | 'all'; label: string }> = [
   { value: 'maintenance', label: 'Maintenance' },
   { value: 'inactive', label: 'Inactive' },
 ];
-
-const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
-const MINUTES = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
 
 export function AdminBedsPage() {
   const { permissions } = useOutletContext<AdminOutletContext>();
@@ -129,7 +126,7 @@ export function AdminBedsPage() {
         </div>
       </div>
 
-      <div className="mb-3 space-y-2">
+      <div className="mb-4 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-input border border-line bg-surface">
             <button onClick={() => setSection('AC')} className={`rounded-l-input px-3 py-1.5 text-xs ${section === 'AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'}`}>AC Hall · {allBeds.data.filter(b => b.section_code === 'AC').length}</button>
@@ -160,21 +157,64 @@ export function AdminBedsPage() {
         <EmptyState title="No beds match these filters." body="Adjust the section, status or search to see inventory." />
       )}
 
-      {section === 'AC' && grouped.individual.length > 0 && (
-        <div className="w-full rounded-card border border-line bg-bg p-4">
-          <div className="grid grid-cols-5 gap-3 sm:grid-cols-10">
-            {grouped.individual.map((row) => <CompactBedTile key={row.space_id} row={row} onClick={() => setSelected(row.space_id)} />)}
+      {/* ─── FLOOR PLAN LAYOUT ─────────────────────────────────────── */}
+      {filtered.length > 0 && (
+        <div className="relative mx-auto w-full max-w-6xl rounded-xl border-2 border-dashed border-gray-400 bg-gray-50 p-6 sm:p-10 shadow-inner">
+          
+          {/* Entrance */}
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex flex-col items-center">
+            <div className="rounded-t-md bg-brand-900 px-8 py-2 text-center text-xs font-bold uppercase tracking-widest text-white shadow-md">
+              Main Entrance
+            </div>
+            <div className="h-4 w-24 bg-gradient-to-b from-gray-200 to-transparent opacity-50" />
           </div>
-        </div>
-      )}
 
-      {section === 'NON_AC' && grouped.units.length > 0 && (
-        <div className="w-full rounded-card border border-line bg-bg p-4">
-          <div className="grid grid-cols-10 gap-2 sm:grid-cols-[repeat(20,minmax(0,1fr))]">
-            {grouped.units.map((unit) => <CompactBunk key={unit.unitCode} unitCode={unit.unitCode} spaces={unit.spaces} onSelect={setSelected} />)}
+          <div className="flex h-full w-full gap-4 sm:gap-8 items-stretch justify-center mt-4">
+            
+            {/* Washroom Block A (Left) */}
+            <Link 
+              to="/admin/washrooms" 
+              className="hidden w-20 flex-col items-center justify-center rounded-lg border-2 border-[#2E7D5B] bg-[#E6F4ED] p-2 hover:scale-[1.02] transition-transform lg:flex"
+            >
+              <span className="text-3xl mb-2">🚽</span>
+              <span className="text-[10px] font-bold uppercase text-[#2E7D5B] text-center leading-tight">Washroom<br/>Block A</span>
+              <span className="mt-2 text-[9px] text-[#2E7D5B]">Manage →</span>
+            </Link>
+
+            {/* Center: Beds */}
+            <div className="flex-1 rounded-lg bg-white p-4 shadow-sm border border-gray-200">
+              <div className="mb-3 flex justify-between items-center text-[10px] text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
+                <span>{section === 'AC' ? 'AC Hall Area' : 'Non-AC Hall Area'}</span>
+                <span>{filtered.length} Spaces</span>
+              </div>
+
+              {section === 'AC' && grouped.individual.length > 0 && (
+                <div className="grid grid-cols-5 gap-2 sm:grid-cols-10">
+                  {grouped.individual.map((row) => <CompactBedTile key={row.space_id} row={row} onClick={() => setSelected(row.space_id)} />)}
+                </div>
+              )}
+
+              {section === 'NON_AC' && grouped.units.length > 0 && (
+                <div className="grid grid-cols-10 gap-1 sm:grid-cols-[repeat(20,minmax(0,1fr))]">
+                  {grouped.units.map((unit) => <CompactBunk key={unit.unitCode} unitCode={unit.unitCode} spaces={unit.spaces} onSelect={setSelected} />)}
+                </div>
+              )}
+            </div>
+
+            {/* Washroom Block B (Right) */}
+            <Link 
+              to="/admin/washrooms" 
+              className="hidden w-20 flex-col items-center justify-center rounded-lg border-2 border-[#2E7D5B] bg-[#E6F4ED] p-2 hover:scale-[1.02] transition-transform lg:flex"
+            >
+              <span className="text-3xl mb-2">🚿</span>
+              <span className="text-[10px] font-bold uppercase text-[#2E7D5B] text-center leading-tight">Washroom<br/>Block B</span>
+              <span className="mt-2 text-[9px] text-[#2E7D5B]">Manage →</span>
+            </Link>
+
           </div>
         </div>
       )}
+      {/* ───────────────────────────────────────────────────────────── */}
 
       {selected && (
         <BedDrawer
@@ -199,10 +239,10 @@ function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) 
   const title = `${row.code} — ${s.label}${row.current_booking_reference ? ` · ${row.current_booking_reference}` : ''}${row.women_reserved ? ' · women-reserved' : ''}`;
   const displayCode = row.code.startsWith('F-') ? row.code.replace('F-00', 'F').replace('F-0', 'F') : row.code.replace('AC-', '');
   return (
-    <button type="button" onClick={onClick} title={title} className="group relative flex h-[64px] w-full flex-col items-center justify-between rounded-md border-2 py-1 transition-transform hover:scale-105 hover:z-10 hover:shadow-sm focus:outline-none" style={{ background: s.fill, borderColor: s.border }}>
-      <div className="h-2 w-3/4 rounded-sm opacity-60" style={{ background: s.pillow }} />
-      <span className="font-mono text-[10px] font-semibold tracking-tight" style={{ color: s.text }}>{displayCode}</span>
-      {row.women_reserved && <span className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-[#B3261E] text-[8px] font-bold text-white shadow">W</span>}
+    <button type="button" onClick={onClick} title={title} className="group relative flex h-[60px] w-full flex-col items-center justify-between rounded border-2 py-1 transition-transform hover:scale-105 hover:z-10 hover:shadow-md focus:outline-none" style={{ background: s.fill, borderColor: s.border }}>
+      <div className="h-1.5 w-3/4 rounded-full opacity-60" style={{ background: s.pillow }} />
+      <span className="font-mono text-[9px] font-bold tracking-tight" style={{ color: s.text }}>{displayCode}</span>
+      {row.women_reserved && <span className="absolute -right-1.5 -top-1.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-[#B3261E] text-[7px] font-bold text-white shadow">W</span>}
     </button>
   );
 }
@@ -212,10 +252,10 @@ function CompactBunk({ unitCode, spaces, onSelect }: { unitCode: string; spaces:
   const lower = spaces.find((s) => s.position === 'lower');
   return (
     <div className="flex flex-col items-center w-full">
-      {upper ? <CompactBunkCell row={upper} letter="U" onClick={() => onSelect(upper.space_id)} /> : <div className="h-7 w-full rounded-sm border border-dashed border-line opacity-25" />}
-      <div className="h-1" />
-      {lower ? <CompactBunkCell row={lower} letter="L" onClick={() => onSelect(lower.space_id)} /> : <div className="h-7 w-full rounded-sm border border-dashed border-line opacity-25" />}
-      <span className="mt-1 font-mono text-[9px] font-medium text-muted">{unitCode.replace('NA-', '')}</span>
+      {upper ? <CompactBunkCell row={upper} letter="U" onClick={() => onSelect(upper.space_id)} /> : <div className="h-6 w-full rounded-sm border border-dashed border-line opacity-25" />}
+      <div className="h-0.5" />
+      {lower ? <CompactBunkCell row={lower} letter="L" onClick={() => onSelect(lower.space_id)} /> : <div className="h-6 w-full rounded-sm border border-dashed border-line opacity-25" />}
+      <span className="mt-1 font-mono text-[8px] font-medium text-muted">{unitCode.replace('NA-', '')}</span>
     </div>
   );
 }
@@ -223,9 +263,9 @@ function CompactBunk({ unitCode, spaces, onSelect }: { unitCode: string; spaces:
 function CompactBunkCell({ row, letter, onClick }: { row: BedRow; letter: 'U' | 'L'; onClick: () => void }) {
   const s = STATUS_STYLE[row.status];
   return (
-    <button type="button" onClick={onClick} className="group relative flex h-7 w-full items-center justify-between rounded-sm border px-1.5 transition-transform hover:scale-110 hover:z-10 hover:shadow-sm" style={{ background: s.fill, borderColor: s.border, color: s.text }}>
-      <span className="text-[10px] font-bold">{letter}</span>
-      {row.women_reserved && <span className="h-2 w-2 rounded-full bg-[#B3261E]" />}
+    <button type="button" onClick={onClick} className="group relative flex h-6 w-full items-center justify-between rounded-sm border px-1 transition-transform hover:scale-110 hover:z-10 hover:shadow-md" style={{ background: s.fill, borderColor: s.border, color: s.text }}>
+      <span className="text-[9px] font-bold">{letter}</span>
+      {row.women_reserved && <span className="h-1.5 w-1.5 rounded-full bg-[#B3261E]" />}
     </button>
   );
 }
@@ -238,13 +278,7 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
   const unassigned = useAsync(() => getUnassignedBookings(sectionCode), [sectionCode, onChanged]);
 
   const [fromDate, setFromDate] = useState('');
-  const [fromHour, setFromHour] = useState('10');
-  const [fromMinute, setFromMinute] = useState('00');
-  const [fromPeriod, setFromPeriod] = useState<'AM' | 'PM'>('AM');
   const [toDate, setToDate] = useState('');
-  const [toHour, setToHour] = useState('10');
-  const [toMinute, setToMinute] = useState('00');
-  const [toPeriod, setToPeriod] = useState<'AM' | 'PM'>('AM');
   const [reason, setReason] = useState('');
   
   const [blocking, setBlocking] = useState(false);
@@ -256,19 +290,11 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
   const [working, setWorking] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
 
-  function buildIso(dateStr: string, hourStr: string, minuteStr: string, period: 'AM' | 'PM') {
-    if (!dateStr) return '';
-    let h = parseInt(hourStr, 10);
-    if (period === 'PM' && h !== 12) h += 12;
-    if (period === 'AM' && h === 12) h = 0;
-    return new Date(`${dateStr}T${h.toString().padStart(2, '0')}:${minuteStr}:00`).toISOString();
-  }
-
   async function doBlock(e: React.FormEvent) {
     e.preventDefault();
     if (!fromDate || !toDate) return;
-    const fromIso = buildIso(fromDate, fromHour, fromMinute, fromPeriod);
-    const toIso = buildIso(toDate, toHour, toMinute, toPeriod);
+    const fromIso = new Date(fromDate).toISOString();
+    const toIso = new Date(toDate).toISOString();
     if (new Date(toIso) <= new Date(fromIso)) { setErr('End time must be after start time.'); return; }
     setBlocking(true); setErr(null);
     try { await blockBed(spaceId, fromIso, toIso, reason || 'Maintenance'); onChanged(); }
@@ -342,7 +368,6 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
               <>
                 <BedDetailBody detail={detail.data} />
 
-                {/* CURRENT BOOKING ACTIONS */}
                 {detail.data.current_booking && (
                   <div className="rounded-input border border-[#E6F4ED] bg-[#E6F4ED] p-4">
                     <div className="flex items-center justify-between mb-2">
@@ -378,7 +403,6 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
                   </div>
                 )}
 
-                {/* MANUAL ASSIGNMENT (DROPDOWN) */}
                 {canAssign && !detail.data.current_booking && (
                   <div className="border-t border-line pt-4">
                     <h3 className="text-sm font-semibold text-ink">Assign Booking</h3>
@@ -390,17 +414,10 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
                       <p className="text-sm text-muted mt-2">No unassigned bookings available for this section.</p>
                     ) : (
                       <form onSubmit={handleManualAssign} className="mt-2 flex gap-2">
-                        <select 
-                          className={`${inputClass} flex-1`} 
-                          value={assignId} 
-                          onChange={(e) => setAssignId(e.target.value)}
-                          required
-                        >
+                        <select className={`${inputClass} flex-1`} value={assignId} onChange={(e) => setAssignId(e.target.value)} required>
                           <option value="" disabled>Select a booking to assign...</option>
                           {unassigned.data.map((b) => (
-                            <option key={b.booking_id} value={b.booking_id}>
-                              {b.reference} — {b.guest_name} ({formatDateTime(b.starts_at).split(',')[0]})
-                            </option>
+                            <option key={b.booking_id} value={b.booking_id}>{b.reference} — {b.guest_name} ({formatDateTime(b.starts_at).split(',')[0]})</option>
                           ))}
                         </select>
                         <Button type="submit" loading={assigning} disabled={!assignId}>Assign</Button>
@@ -409,7 +426,6 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
                   </div>
                 )}
 
-                {/* DISABLE BED */}
                 {canManage && (
                   <div className="border-t border-line pt-4 flex items-center justify-between">
                     <div>
@@ -422,7 +438,6 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
                   </div>
                 )}
 
-                {/* MAINTENANCE BLOCK */}
                 {canBlock && (
                   <div className="border-t border-line pt-4">
                     <h3 className="text-sm font-semibold text-ink mb-2">Block for Maintenance</h3>
