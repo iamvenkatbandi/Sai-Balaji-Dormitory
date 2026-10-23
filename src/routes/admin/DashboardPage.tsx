@@ -35,23 +35,29 @@ export function AdminDashboardPage() {
       </div>
 
       <div className="mt-8 grid gap-4 md:grid-cols-3">
-        <SectionCard title="Today's operations">
+        <SectionCard title="Operations">
           <ul className="space-y-2 text-sm">
             <li><Link to="/admin/reception" className="text-brand-900 hover:underline">Reception — arrivals & departures →</Link></li>
             <li><Link to="/admin/bookings" className="text-brand-900 hover:underline">All bookings →</Link></li>
             <li><Link to="/admin/beds" className="text-brand-900 hover:underline">Bed inventory →</Link></li>
+            <li><Link to="/admin/cleaning" className="text-brand-900 hover:underline">Cleaning queue →</Link></li>
+            <li><Link to="/admin/maintenance" className="text-brand-900 hover:underline">Maintenance tickets →</Link></li>
+          </ul>
+        </SectionCard>
+        <SectionCard title="Finance & Reports">
+          <ul className="space-y-2 text-sm">
+            <li><Link to="/admin/finance" className="text-brand-900 hover:underline">Payments & refunds →</Link></li>
+            <li><Link to="/admin/reports" className="text-brand-900 hover:underline">Reports & analytics →</Link></li>
+            <li><Link to="/admin/rates" className="text-brand-900 hover:underline">Rates & pricing →</Link></li>
           </ul>
         </SectionCard>
         <SectionCard title="Configuration">
           <ul className="space-y-2 text-sm">
-            <li><Link to="/admin/rates" className="text-brand-900 hover:underline">Rates & pricing →</Link></li>
             <li><Link to="/admin/settings" className="text-brand-900 hover:underline">Property settings →</Link></li>
+            <li><Link to="/admin/policies" className="text-brand-900 hover:underline">Policies →</Link></li>
+            <li><Link to="/admin/staff" className="text-brand-900 hover:underline">Staff & roles →</Link></li>
+            <li><Link to="/admin/washrooms" className="text-brand-900 hover:underline">Washrooms →</Link></li>
           </ul>
-        </SectionCard>
-        <SectionCard title="Phase 4b">
-          <p className="text-sm text-muted">
-            Finance, reports, staff &amp; roles, washrooms, cleaning, maintenance modules are delivered next.
-          </p>
         </SectionCard>
       </div>
     </>

@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type {
   AdminBookingRow, AdminDashboardMetrics, BedDetail, BedRow, BedStatus,
-  BookingStatus, ProductType, RatePlanVersion,
+  BookingStatus, ProductType, RatePlanVersion, Settlement,
 } from './database.types';
 
 async function rpcError(err: unknown): Promise<Error> {
@@ -235,4 +235,15 @@ export async function revokeWomenReserved(spaceIds: string[]): Promise<number> {
   });
   if (error) throw await rpcError(error);
   return data as number;
+}
+
+export async function getSettlements(): Promise<Settlement[]> {
+  const { data, error } = await supabase
+    .from('settlements')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100);
+  
+  if (error) throw await rpcError(error);
+  return (data ?? []) as Settlement[];
 }

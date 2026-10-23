@@ -190,3 +190,15 @@ export interface AdminBookingRow {
   guest_email: string | null;
   space_code: string | null;
 }
+
+export interface Settlement {
+  id: number;
+  settlement_id: string;
+  amount: number;
+  fees: number;
+  tax: number;
+  utr: string | null;
+  status: string;
+  created_at: string;
+  recorded_at: string;
+}

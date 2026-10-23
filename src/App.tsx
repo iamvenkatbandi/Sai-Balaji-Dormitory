@@ -34,15 +34,25 @@ import { ProfilePage } from './routes/portal/ProfilePage';
 import { AdminDashboardPage } from './routes/admin/DashboardPage';
 import { AdminBedsPage } from './routes/admin/BedsPage';
 import { AdminBookingsPage } from './routes/admin/BookingsPage';
+import { AdminBookingDetailPage } from './routes/admin/BookingDetailPage';
 import { AdminReceptionPage } from './routes/admin/ReceptionPage';
 import { AdminRatesPage } from './routes/admin/RatesPage';
 import { AdminSettingsPage } from './routes/admin/SettingsPage';
+import { AdminFinancePage } from './routes/admin/FinancePage';
+import { AdminReportsPage } from './routes/admin/ReportsPage';
+import { AdminCleaningPage } from './routes/admin/CleaningPage';
+import { AdminMaintenancePage } from './routes/admin/MaintenancePage';
+import { AdminWashroomsPage } from './routes/admin/WashroomsPage';
+import { AdminStaffPage } from './routes/admin/StaffPage';
+import { AdminPoliciesPage } from './routes/admin/PoliciesPage';
 
 function StaffPlaceholder() {
   return (
     <div className="mx-auto max-w-3xl py-16">
       <h1 className="text-2xl font-semibold text-ink">Staff operations</h1>
-      <p className="mt-2 text-sm text-muted">See <a href="/admin" className="text-brand-900 underline">/admin</a> for the Control Room.</p>
+      <p className="mt-2 text-sm text-muted">
+        Staff operations are handled from the <a href="/admin" className="text-brand-900 underline">Admin Control Room</a>.
+      </p>
     </div>
   );
 }
@@ -101,7 +111,15 @@ const router = createBrowserRouter([
           { path: 'reception', element: <AdminReceptionPage /> },
           { path: 'beds', element: <AdminBedsPage /> },
           { path: 'bookings', element: <AdminBookingsPage /> },
+          { path: 'bookings/:id', element: <AdminBookingDetailPage /> },
+          { path: 'cleaning', element: <AdminCleaningPage /> },
+          { path: 'maintenance', element: <AdminMaintenancePage /> },
+          { path: 'washrooms', element: <AdminWashroomsPage /> },
+          { path: 'finance', element: <AdminFinancePage /> },
+          { path: 'reports', element: <AdminReportsPage /> },
           { path: 'rates', element: <AdminRatesPage /> },
+          { path: 'policies', element: <AdminPoliciesPage /> },
+          { path: 'staff', element: <AdminStaffPage /> },
           { path: 'settings', element: <AdminSettingsPage /> },
         ],
       },
