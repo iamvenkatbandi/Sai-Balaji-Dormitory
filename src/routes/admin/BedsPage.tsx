@@ -259,12 +259,10 @@ function FloorPlanSide({ items, isBunk, onSelect }: {
   isBunk: boolean; 
   onSelect: (id: string) => void 
 }) {
-  // We force exactly 5 rows per side as requested.
   const rows = 5;
   const cols = Math.ceil(items.length / rows);
   const grid = [];
   
-  // Build a 2D grid mapping left-to-right (row major)
   for (let r = 0; r < rows; r++) {
     const row = [];
     for (let c = 0; c < cols; c++) {
@@ -281,11 +279,9 @@ function FloorPlanSide({ items, isBunk, onSelect }: {
       {grid.map((row, rIdx) => (
         <div 
           key={rIdx} 
-          // Adds a horizontal walkway after every 2 rows
           className={`flex gap-1.5 w-full ${rIdx > 0 && rIdx % 2 === 0 ? 'mt-4 sm:mt-6' : ''}`}
         >
           {row.map((item, cIdx) => (
-            // Removed the vertical gap between columns (ml-6)
             <div key={cIdx} className="flex-1 min-w-0">
               {isBunk ? (
                 <CompactBunk unitCode={item.unitCode} spaces={item.spaces} onSelect={onSelect} />
@@ -357,6 +353,11 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
   const detail = useAsync(() => getBedDetail(spaceId), [spaceId, onChanged]);
   const unassigned = useAsync(() => getUnassignedBookings(sectionCode), [sectionCode, onChanged]);
 
+  // Fallback logic: Check current_booking OR the first upcoming booking
+  const activeBooking = detail.status === 'success' 
+    ? (detail.data.current_booking || (detail.data.upcoming_bookings.length > 0 ? detail.data.upcoming_bookings[0] : null))
+    : null;
+
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [reason, setReason] = useState('');
@@ -402,19 +403,19 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
 
   async function handleTransfer(e: React.FormEvent) {
     e.preventDefault();
-    if (!detail.data?.current_booking) return;
+    if (!activeBooking) return;
     setTransferring(true); setErr(null);
     try {
-      await transferBooking(detail.data.current_booking.id, spaceId);
+      await transferBooking(activeBooking.id, spaceId);
       setTransferRef(''); onChanged();
     } catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Transfer failed'); }
     finally { setTransferring(false); }
   }
 
   async function handleCheckIn() {
-    if (!detail.data?.current_booking) return;
+    if (!activeBooking) return;
     setWorking(true); setErr(null);
-    try { await checkInBooking(detail.data.current_booking.id); onChanged(); }
+    try { await checkInBooking(activeBooking.id); onChanged(); }
     catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Check-in failed'); }
     finally { setWorking(false); }
   }
@@ -448,28 +449,28 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
               <>
                 <BedDetailBody detail={detail.data} />
 
-                {detail.data.current_booking && (
+                {activeBooking && (
                   <div className="rounded-input border border-[#E6F4ED] bg-[#E6F4ED] p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-bold text-[#2E7D5B]">Current Booking</h3>
+                      <h3 className="text-sm font-bold text-[#2E7D5B]">Reserved Details</h3>
                       <span className="text-xs font-semibold uppercase px-2 py-0.5 rounded bg-white text-[#2E7D5B]">
-                        {detail.data.current_booking.status.replace('_', ' ')}
+                        {activeBooking.status.replace('_', ' ')}
                       </span>
                     </div>
                     
                     <div className="text-sm text-[#2E7D5B] mb-4 space-y-1">
-                      <p><strong>Ref:</strong> {detail.data.current_booking.reference}</p>
-                      <p><strong>Guest:</strong> {detail.data.current_booking.guest_name || '—'}</p>
-                      <p><strong>Dates:</strong> {formatDateTime(detail.data.current_booking.starts_at).split(',')[0]} to {formatDateTime(detail.data.current_booking.ends_at).split(',')[0]}</p>
+                      <p><strong>Guest:</strong> {activeBooking.guest_name || '—'}</p>
+                      <p><strong>Ref:</strong> {activeBooking.reference}</p>
+                      <p><strong>Dates:</strong> {formatDateTime(activeBooking.starts_at).split(',')[0]} to {formatDateTime(activeBooking.ends_at).split(',')[0]}</p>
                     </div>
 
                     <div className="flex flex-wrap gap-2">
-                      {detail.data.current_booking.status === 'confirmed' && (
+                      {activeBooking.status === 'confirmed' && (
                         <Button onClick={handleCheckIn} loading={working} className="bg-[#2E7D5B] text-white hover:bg-[#236346] w-full sm:w-auto">
                           Check In Guest
                         </Button>
                       )}
-                      {detail.data.current_booking.status === 'checked_in' && (
+                      {activeBooking.status === 'checked_in' && (
                         <Button onClick={() => setShowBilling(true)} loading={working} variant="danger" className="w-full sm:w-auto">
                           Check Out Guest
                         </Button>
@@ -483,7 +484,7 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
                   </div>
                 )}
 
-                {canAssign && !detail.data.current_booking && (
+                {canAssign && !activeBooking && (
                   <div className="border-t border-line pt-4">
                     <h3 className="text-sm font-semibold text-ink">Assign Booking</h3>
                     {unassigned.status === 'loading' ? (
@@ -549,9 +550,9 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
         </div>
       </div>
 
-      {showBilling && detail.data?.current_booking && (
+      {showBilling && activeBooking && (
         <CheckoutBillingModal
-          bookingId={detail.data.current_booking.id}
+          bookingId={activeBooking.id}
           onClose={() => setShowBilling(false)}
           onSuccess={() => { setShowBilling(false); onChanged(); }}
         />
