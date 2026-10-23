@@ -11,7 +11,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Button } from '../../components/Button';
 import { Field, inputClass } from '../../components/Field';
 import { formatDateTime } from '../../lib/format';
-import type { WashroomArea } from '../../lib/database.types';
+import type { WashroomArea, WashroomFixture } from '../../lib/database.types';
 
 // ─── Status Styling ────────────────────────────────────────────────
 const STATUS_STYLE: Record<string, { fill: string; border: string; text: string; label: string }> = {
@@ -21,18 +21,12 @@ const STATUS_STYLE: Record<string, { fill: string; border: string; text: string;
   inactive:    { fill: '#EFF1EF', border: '#69736D', text: '#69736D', label: 'Inactive' },
 };
 
-const FILTER_OPTIONS = [
-  { value: 'all', label: 'All' },
-  { value: 'operational', label: 'Operational' },
-  { value: 'cleaning', label: 'Cleaning' },
-  { value: 'maintenance', label: 'Maintenance' },
-  { value: 'inactive', label: 'Inactive' },
-];
+const TYPE_ICON = { toilet: '🚽', basin: '🚰', shower: '🚿' };
 
-async function loadWashrooms(): Promise<Array<WashroomArea & { section_code: string }>> {
+async function loadWashrooms(): Promise<Array<WashroomArea & { section_code: string; washroom_fixtures: WashroomFixture[] }>> {
   const { data, error } = await supabase
     .from('washroom_areas')
-    .select('*, accommodation_sections!inner(code)')
+    .select('*, accommodation_sections!inner(code), washroom_fixtures(*)')
     .order('name');
   if (error) throw error;
   return (data ?? []).map((a: any) => ({ 
@@ -46,9 +40,7 @@ export function AdminWashroomsPage() {
   const canManage = permissions.includes('settings.manage') || permissions.includes('reception.operate');
 
   const [section, setSection] = useState<'AC' | 'NON_AC'>('AC');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedFixture, setSelectedFixture] = useState<WashroomFixture | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -57,31 +49,15 @@ export function AdminWashroomsPage() {
   // Realtime listener
   useEffect(() => {
     const channel = supabase.channel('washroom-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'washroom_areas' }, () => setRefreshKey(k => k + 1))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'washroom_fixtures' }, () => setRefreshKey(k => k + 1))
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const sectionFiltered = useMemo(() => {
+  const filtered = useMemo(() => {
     if (washrooms.status !== 'success') return [];
     return washrooms.data.filter(w => w.section_code === section);
   }, [washrooms.status === 'success' ? washrooms.data : null, section]);
-
-  const filtered = useMemo(() => {
-    let rows = sectionFiltered;
-    if (statusFilter !== 'all') rows = rows.filter(w => w.status === statusFilter);
-    const q = search.trim().toLowerCase();
-    if (q) rows = rows.filter(w => w.name.toLowerCase().includes(q));
-    return rows;
-  }, [sectionFiltered, statusFilter, search]);
-
-  const counts = useMemo(() => {
-    const c = { operational: 0, cleaning: 0, maintenance: 0, inactive: 0 };
-    for (const w of sectionFiltered) {
-      if (w.status in c) c[w.status as keyof typeof c]++;
-    }
-    return c;
-  }, [sectionFiltered]);
 
   if (washrooms.status === 'loading') return <Spinner />;
   if (washrooms.status === 'error') return <ErrorState message={washrooms.error.message} />;
@@ -90,129 +66,84 @@ export function AdminWashroomsPage() {
     <>
       <PageHeader
         eyebrow="Facilities"
-        title="Washroom Registry"
-        intro="Live map view of washroom blocks. Updates automatically."
-        actions={canManage && <Button onClick={() => setShowCreate(true)}>Add Washroom</Button>}
+        title="Washroom Fixtures"
+        intro="Track every toilet, basin, and shower individually."
+        actions={canManage && <Button onClick={() => setShowCreate(true)}>Add Washroom Block</Button>}
       />
 
-      <div className="mb-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Section Tabs */}
-          <div className="flex rounded-input border border-line bg-surface">
-            <button 
-              onClick={() => setSection('AC')} 
-              className={`rounded-l-input px-3 py-1.5 text-xs font-medium transition ${section === 'AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'}`}
-            >
-              AC Hall
-            </button>
-            <button 
-              onClick={() => setSection('NON_AC')} 
-              className={`rounded-r-input px-3 py-1.5 text-xs font-medium transition ${section === 'NON_AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'}`}
-            >
-              Non-AC Hall
-            </button>
-          </div>
-          
-          <input 
-            className={`${inputClass} max-w-[180px] py-1.5 text-xs`} 
-            placeholder="Search block name" 
-            value={search} 
-            onChange={(e) => setSearch(e.target.value)} 
-          />
-
-          {/* Status Filters */}
-          <div className="flex flex-wrap gap-1">
-            {FILTER_OPTIONS.map((opt) => {
-              const active = statusFilter === opt.value;
-              return (
-                <button 
-                  key={opt.value} 
-                  onClick={() => setStatusFilter(opt.value)} 
-                  className={`rounded-full border px-2.5 py-0.5 text-xs transition ${active ? 'border-brand-900 bg-brand-900 text-white' : 'border-line bg-surface text-ink hover:bg-bg'}`}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex rounded-input border border-line bg-surface">
+          <button 
+            onClick={() => setSection('AC')} 
+            className={`rounded-l-input px-4 py-2 text-sm font-medium transition ${section === 'AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'}`}
+          >
+            AC Hall
+          </button>
+          <button 
+            onClick={() => setSection('NON_AC')} 
+            className={`rounded-r-input px-4 py-2 text-sm font-medium transition ${section === 'NON_AC' ? 'bg-brand-900 text-white' : 'text-ink hover:bg-bg'}`}
+          >
+            Non-AC Hall
+          </button>
         </div>
-
+        
         {/* Legend */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
           {Object.entries(STATUS_STYLE).map(([key, style]) => (
-            <span key={key} className="inline-flex items-center gap-1">
-              <span className="inline-block h-2.5 w-2.5 rounded border" style={{ background: style.fill, borderColor: style.border }} />
-              <span className="tabular-nums text-ink">{counts[key as keyof typeof counts]}</span>
+            <span key={key} className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-3 w-3 rounded-full border" style={{ background: style.fill, borderColor: style.border }} />
               <span>{style.label}</span>
             </span>
           ))}
-          <span className="ml-auto">
-            Showing <span className="tabular-nums text-ink">{filtered.length}</span> of <span className="tabular-nums text-ink">{sectionFiltered.length}</span>
-          </span>
         </div>
       </div>
 
       {filtered.length === 0 ? (
         <EmptyState 
-          title="No washrooms match these filters." 
-          body="Adjust the section, status or search to see washrooms." 
+          title={`No washrooms in ${section === 'AC' ? 'AC' : 'Non-AC'} Hall`} 
+          body="Add a washroom block to start tracking its fixtures." 
         />
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {filtered.map((w) => {
-            const s = STATUS_STYLE[w.status] || STATUS_STYLE.operational;
-            // Shorten the name for the compact tile
-            const displayName = w.name.replace('AC Washroom ', '').replace('Non-AC Washroom ', '');
-            
-            return (
-              <button
-                key={w.id}
-                onClick={() => setSelected(w.id)}
-                className="group relative flex h-[90px] flex-col justify-between rounded-md border-2 p-2 text-left transition-transform hover:scale-105 hover:z-10 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-900"
-                style={{ background: s.fill, borderColor: s.border }}
-                title={w.name}
-              >
-                {/* Header: Block Name */}
-                <div className="w-full flex justify-between items-start">
-                  <span className="font-semibold text-xs leading-tight truncate pr-1" style={{ color: s.text }}>
-                    {displayName}
-                  </span>
-                </div>
-                
-                {/* Fixtures Count */}
-                <div className="mt-1 grid grid-cols-3 gap-1 w-full text-center text-[10px] bg-white/50 rounded p-1">
-                  <div>
-                    <span className="block text-[8px] uppercase tracking-wide text-muted">Toilets</span>
-                    <span className="font-bold" style={{ color: s.text }}>{w.toilet_count ?? 0}</span>
-                  </div>
-                  <div className="border-x border-white/50">
-                    <span className="block text-[8px] uppercase tracking-wide text-muted">Basins</span>
-                    <span className="font-bold" style={{ color: s.text }}>{w.basin_count ?? 0}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[8px] uppercase tracking-wide text-muted">Showers</span>
-                    <span className="font-bold" style={{ color: s.text }}>{w.shower_count ?? 0}</span>
-                  </div>
-                </div>
-                
-                {/* Footer Status */}
-                <div className="w-full text-center mt-1">
-                   <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: s.text }}>
-                     {s.label}
-                   </span>
-                </div>
-              </button>
-            );
-          })}
+        <div className="space-y-8">
+          {filtered.map((block) => (
+            <div key={block.id} className="rounded-card border border-line bg-surface p-5 shadow-card">
+              <div className="flex items-center justify-between border-b border-line pb-3 mb-4">
+                <h3 className="text-lg font-semibold text-ink">{block.name}</h3>
+                <span className="text-xs text-muted">{block.washroom_fixtures.length} total fixtures</span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                {block.washroom_fixtures.sort((a, b) => a.label.localeCompare(b.label)).map((fixture) => {
+                  const s = STATUS_STYLE[fixture.status] || STATUS_STYLE.operational;
+                  return (
+                    <button
+                      key={fixture.id}
+                      onClick={() => setSelectedFixture(fixture)}
+                      className="group flex flex-col items-center justify-center rounded-lg border-2 p-3 transition-transform hover:scale-105 hover:shadow-md focus:outline-none"
+                      style={{ background: s.fill, borderColor: s.border }}
+                    >
+                      <span className="text-2xl mb-1" aria-hidden>{TYPE_ICON[fixture.fixture_type]}</span>
+                      <span className="font-mono text-xs font-bold" style={{ color: s.text }}>
+                        {fixture.label}
+                      </span>
+                      <span className="text-[9px] uppercase tracking-wider mt-1 opacity-80" style={{ color: s.text }}>
+                        {s.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
-      {selected && (
-        <WashroomDrawer
-          washroomId={selected}
+      {selectedFixture && (
+        <FixtureDrawer
+          fixture={selectedFixture}
           canManage={canManage}
-          onClose={() => setSelected(null)}
-          onChanged={() => { setSelected(null); setRefreshKey(k => k + 1); }}
+          onClose={() => setSelectedFixture(null)}
+          onChanged={() => { setSelectedFixture(null); setRefreshKey(k => k + 1); }}
         />
       )}
 
@@ -227,45 +158,21 @@ export function AdminWashroomsPage() {
   );
 }
 
-// ─── Operations Drawer ─────────────────────────────────────────────
-function WashroomDrawer({ washroomId, canManage, onClose, onChanged }: {
-  washroomId: string; canManage: boolean; onClose: () => void; onChanged: () => void;
+// ─── Fixture Action Drawer ─────────────────────────────────────────
+function FixtureDrawer({ fixture, canManage, onClose, onChanged }: {
+  fixture: WashroomFixture; canManage: boolean; onClose: () => void; onChanged: () => void;
 }) {
-  const [washroom, setWashroom] = useState<WashroomArea | null>(null);
-  const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  const [name, setName] = useState('');
-  const [toilets, setToilets] = useState<number | null>(null);
-  const [basins, setBasins] = useState<number | null>(null);
-  const [showers, setShowers] = useState<number | null>(null);
-  const [notes, setNotes] = useState('');
-
-  useEffect(() => {
-    supabase.from('washroom_areas').select('*').eq('id', washroomId).maybeSingle()
-      .then(({ data }) => {
-        if (data) {
-          setWashroom(data as WashroomArea);
-          setName(data.name);
-          setToilets(data.toilet_count);
-          setBasins(data.basin_count);
-          setShowers(data.shower_count);
-          setNotes(data.notes || '');
-        }
-        setLoading(false);
-      });
-  }, [washroomId]);
 
   async function updateStatus(newStatus: string) {
     if (!canManage) return;
     setWorking(true); setErr(null);
     try {
       const updates: any = { status: newStatus };
-      if (newStatus === 'operational') {
-        updates.last_cleaned_at = new Date().toISOString();
-      }
-      const { error } = await supabase.from('washroom_areas').update(updates).eq('id', washroomId);
+      if (newStatus === 'operational') updates.last_cleaned_at = new Date().toISOString();
+      
+      const { error } = await supabase.from('washroom_fixtures').update(updates).eq('id', fixture.id);
       if (error) throw error;
       onChanged();
     } catch (e) {
@@ -273,76 +180,36 @@ function WashroomDrawer({ washroomId, canManage, onClose, onChanged }: {
     } finally { setWorking(false); }
   }
 
-  async function saveDetails(e: React.FormEvent) {
-    e.preventDefault();
-    if (!canManage) return;
-    setWorking(true); setErr(null);
-    try {
-      const { error } = await supabase.from('washroom_areas').update({
-        name, toilet_count: toilets, basin_count: basins, shower_count: showers, notes: notes || null,
-      }).eq('id', washroomId);
-      if (error) throw error;
-      onChanged();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed to save');
-    } finally { setWorking(false); }
-  }
-
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-card bg-surface shadow-overlay" onClick={e => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
-          <h2 className="text-base font-semibold text-ink">Washroom Operations</h2>
-          <button onClick={onClose} className="rounded-input p-1.5 text-muted hover:bg-bg">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm rounded-card bg-surface p-6 shadow-overlay" onClick={e => e.stopPropagation()}>
+        <div className="text-center mb-6">
+          <span className="text-4xl block mb-2">{TYPE_ICON[fixture.fixture_type]}</span>
+          <h2 className="text-lg font-bold text-ink capitalize">{fixture.fixture_type} {fixture.label}</h2>
+          <p className="text-sm text-muted">
+            Last Cleaned: {fixture.last_cleaned_at ? formatDateTime(fixture.last_cleaned_at) : 'Never'}
+          </p>
         </div>
 
-        <div className="p-5 space-y-6">
-          {loading && <Spinner />}
-          {err && <div className="p-3 bg-[#FBEAE8] text-[#B3261E] text-sm rounded">{err}</div>}
+        {err && <div className="mb-4 p-3 bg-[#FBEAE8] text-[#B3261E] text-sm rounded">{err}</div>}
 
-          {washroom && (
-            <>
-              <div>
-                <h3 className="text-sm font-semibold text-ink mb-2">Status Actions</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button variant={washroom.status === 'operational' ? 'primary' : 'secondary'} onClick={() => updateStatus('operational')} loading={working} className="bg-[#2E7D5B] hover:bg-[#236346] text-white border-transparent">Mark Clean & Open</Button>
-                  <Button variant={washroom.status === 'cleaning' ? 'primary' : 'secondary'} onClick={() => updateStatus('cleaning')} loading={working} className="bg-[#8A5A00] hover:bg-[#6B4600] text-white border-transparent">Mark for Cleaning</Button>
-                  <Button variant={washroom.status === 'maintenance' ? 'primary' : 'secondary'} onClick={() => updateStatus('maintenance')} loading={working} className="bg-[#B3261E] hover:bg-[#8E1E18] text-white border-transparent">Report Maintenance</Button>
-                  <Button variant={washroom.status === 'inactive' ? 'primary' : 'secondary'} onClick={() => updateStatus('inactive')} loading={working}>Mark Closed</Button>
-                </div>
-                <p className="mt-3 text-xs text-muted">Last Cleaned: <strong>{washroom.last_cleaned_at ? formatDateTime(washroom.last_cleaned_at) : 'Never'}</strong></p>
-              </div>
-
-              {canManage && (
-                <form onSubmit={saveDetails} className="border-t border-line pt-4 space-y-3">
-                  <h3 className="text-sm font-semibold text-ink mb-2">Edit Details</h3>
-                  <Field label="Name" htmlFor="w-name" required><input id="w-name" className={inputClass} value={name} onChange={e => setName(e.target.value)} required /></Field>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Field label="Toilets" htmlFor="w-t"><input id="w-t" type="number" min={0} className={inputClass} value={toilets ?? ''} onChange={e => setToilets(e.target.value ? Number(e.target.value) : null)} /></Field>
-                    <Field label="Basins" htmlFor="w-b"><input id="w-b" type="number" min={0} className={inputClass} value={basins ?? ''} onChange={e => setBasins(e.target.value ? Number(e.target.value) : null)} /></Field>
-                    <Field label="Showers" htmlFor="w-s"><input id="w-s" type="number" min={0} className={inputClass} value={showers ?? ''} onChange={e => setShowers(e.target.value ? Number(e.target.value) : null)} /></Field>
-                  </div>
-                  <Field label="Notes" htmlFor="w-notes"><textarea id="w-notes" rows={2} className={inputClass} value={notes} onChange={e => setNotes(e.target.value)} /></Field>
-                  <Button type="submit" loading={working} variant="secondary">Save Details</Button>
-                </form>
-              )}
-            </>
-          )}
+        <div className="space-y-2">
+          <Button onClick={() => updateStatus('operational')} loading={working} className="w-full bg-[#2E7D5B] text-white hover:bg-[#236346]">Mark Clean & Open</Button>
+          <Button onClick={() => updateStatus('cleaning')} loading={working} className="w-full bg-[#8A5A00] text-white hover:bg-[#6B4600]">Mark for Cleaning</Button>
+          <Button onClick={() => updateStatus('maintenance')} loading={working} className="w-full bg-[#B3261E] text-white hover:bg-[#8E1E18]">Report Maintenance</Button>
+          <Button onClick={() => updateStatus('inactive')} loading={working} className="w-full bg-gray-500 text-white hover:bg-gray-600">Take Offline</Button>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Create Modal ──────────────────────────────────────────────────
+// ─── Create Block Modal ────────────────────────────────────────────
 function CreateModal({ sectionCode, onClose, onSuccess }: { sectionCode: 'AC' | 'NON_AC'; onClose: () => void; onSuccess: () => void }) {
   const [name, setName] = useState('');
-  const [toilets, setToilets] = useState<number | null>(null);
-  const [basins, setBasins] = useState<number | null>(null);
-  const [showers, setShowers] = useState<number | null>(null);
-  const [notes, setNotes] = useState('');
+  const [toilets, setToilets] = useState<number>(0);
+  const [basins, setBasins] = useState<number>(0);
+  const [showers, setShowers] = useState<number>(0);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -354,11 +221,16 @@ function CreateModal({ sectionCode, onClose, onSuccess }: { sectionCode: 'AC' | 
       const { data: sec, error: secErr } = await supabase.from('accommodation_sections').select('id').eq('property_id', propertyId).eq('code', sectionCode).maybeSingle();
       if (secErr) throw secErr;
       if (!sec) throw new Error('Section not found');
-      const { error } = await supabase.from('washroom_areas').insert({
-        section_id: (sec as { id: string }).id,
-        name, toilet_count: toilets, basin_count: basins, shower_count: showers,
-        notes: notes || null, status: 'operational'
+
+      const { error } = await supabase.rpc('admin_create_washroom_area', {
+        p_section_id: (sec as { id: string }).id,
+        p_name: name,
+        p_toilets: toilets,
+        p_basins: basins,
+        p_showers: showers,
+        p_notes: null
       });
+      
       if (error) throw error;
       onSuccess();
     } catch (e) {
@@ -367,22 +239,34 @@ function CreateModal({ sectionCode, onClose, onSuccess }: { sectionCode: 'AC' | 
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <form onSubmit={submit} className="w-full max-w-md rounded-card bg-surface p-6 shadow-overlay" onClick={e => e.stopPropagation()}>
-        <h2 className="text-lg font-semibold text-ink mb-4">Add Washroom ({sectionCode === 'AC' ? 'AC Hall' : 'Non-AC Hall'})</h2>
-        <div className="space-y-3">
-          <Field label="Name" htmlFor="w-name" required><input id="w-name" className={inputClass} placeholder="e.g. AC Washroom Block C" value={name} onChange={e => setName(e.target.value)} required /></Field>
+        <h2 className="text-lg font-semibold text-ink mb-4">Add Washroom Block</h2>
+        
+        <div className="space-y-4">
+          <Field label="Block Name" htmlFor="w-name" required>
+            <input id="w-name" className={inputClass} placeholder="e.g. AC Washroom Block A" value={name} onChange={e => setName(e.target.value)} required />
+          </Field>
+          
           <div className="grid grid-cols-3 gap-2">
-            <Field label="Toilets" htmlFor="w-t"><input id="w-t" type="number" min={0} className={inputClass} value={toilets ?? ''} onChange={e => setToilets(e.target.value ? Number(e.target.value) : null)} /></Field>
-            <Field label="Basins" htmlFor="w-b"><input id="w-b" type="number" min={0} className={inputClass} value={basins ?? ''} onChange={e => setBasins(e.target.value ? Number(e.target.value) : null)} /></Field>
-            <Field label="Showers" htmlFor="w-s"><input id="w-s" type="number" min={0} className={inputClass} value={showers ?? ''} onChange={e => setShowers(e.target.value ? Number(e.target.value) : null)} /></Field>
+            <Field label="Toilets" htmlFor="w-t">
+              <input id="w-t" type="number" min={0} className={inputClass} value={toilets} onChange={e => setToilets(Number(e.target.value))} />
+            </Field>
+            <Field label="Basins" htmlFor="w-b">
+              <input id="w-b" type="number" min={0} className={inputClass} value={basins} onChange={e => setBasins(Number(e.target.value))} />
+            </Field>
+            <Field label="Showers" htmlFor="w-s">
+              <input id="w-s" type="number" min={0} className={inputClass} value={showers} onChange={e => setShowers(Number(e.target.value))} />
+            </Field>
           </div>
-          <Field label="Notes" htmlFor="w-notes"><textarea id="w-notes" rows={2} className={inputClass} value={notes} onChange={e => setNotes(e.target.value)} /></Field>
+          <p className="text-xs text-muted">This will automatically generate individual tiles for every fixture.</p>
         </div>
+        
         {err && <p className="mt-3 text-sm text-[#B3261E]">{err}</p>}
+        
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="secondary" type="button" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button type="submit" loading={saving}>Create Washroom</Button>
+          <Button type="submit" loading={saving}>Create Block</Button>
         </div>
       </form>
     </div>

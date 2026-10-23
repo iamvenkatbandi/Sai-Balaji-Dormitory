@@ -336,3 +336,13 @@ export interface ProposedSpace {
   position: string;
   rationale: string;
 }
+
+export interface WashroomFixture {
+  id: string;
+  washroom_area_id: string;
+  fixture_type: 'toilet' | 'basin' | 'shower';
+  label: string;
+  status: 'operational' | 'cleaning' | 'maintenance' | 'inactive';
+  last_cleaned_at: string | null;
+  created_at: string;
+}
