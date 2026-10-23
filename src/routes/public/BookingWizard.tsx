@@ -57,7 +57,8 @@ export function BookingWizard() {
   const [startMinute, setStartMinute] = useState(initialMinute.toString().padStart(2, '0'));
   const [startPeriod, setStartPeriod] = useState<'AM' | 'PM'>(initialPeriod as 'AM' | 'PM');
   
-  const [hours, setHours] = useState(2);
+  // Default duration is now 1 hour
+  const [hours, setHours] = useState(1);
 
   const [quote, setQuote] = useState<QuoteResponse | null>(null);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -91,9 +92,11 @@ export function BookingWizard() {
 
   const familyPublished = family.status === 'success' && !!family.data;
   const blockedByFamily = product === 'ac_family_compartment' && !familyPublished;
+  
+  // Minimum duration is now 1 hour (or 12 for family compartments)
   const minHours = product === 'ac_family_compartment'
     ? 12
-    : Math.max(2, Math.ceil((settings.status === 'success' && settings.data?.min_hourly_minutes ? settings.data.min_hourly_minutes : 120) / 60));
+    : Math.max(1, Math.ceil((settings.status === 'success' && settings.data?.min_hourly_minutes ? settings.data.min_hourly_minutes : 60) / 60));
 
   useEffect(() => {
     if (step !== 4 || !startsAt || !endsAt) return;
@@ -116,10 +119,9 @@ export function BookingWizard() {
         product, startsAt, endsAt,
         guestName, guestGender,
         contactEmail,
-        contactPhone: contactPhone || null,
+        contactPhone,
       });
       if (!res.ok) { 
-        // Show detail if available, otherwise the error code
         setHoldError(res.detail ? `${res.error}: ${res.detail}` : res.error); 
         return; 
       }
@@ -154,7 +156,6 @@ export function BookingWizard() {
   async function handleDevConfirm() {
     if (!hold) return;
     
-    // 1. Show success UI immediately
     setConfirmedRow({
       reference: hold.reference,
       status: 'confirmed',
@@ -166,7 +167,6 @@ export function BookingWizard() {
     setConfirmState('confirmed');
     setStep(8);
 
-    // 2. Update database in the background
     try {
       await devConfirmBooking(hold.booking_id);
     } catch (err) {
@@ -202,7 +202,6 @@ export function BookingWizard() {
         description: `Booking ${hold.reference}`,
         prefill: { name: guestName, email: contactEmail, contact: contactPhone },
         handler: async (response) => {
-          // 1. Show success UI immediately (Optimistic)
           setConfirmedRow({
             reference: hold.reference,
             status: 'confirmed',
@@ -214,7 +213,6 @@ export function BookingWizard() {
           setConfirmState('confirmed');
           setStep(8);
 
-          // 2. Verify in the background
           try {
             await verifyRazorpayPayment(hold.booking_id, response);
           } catch (err) {
@@ -361,7 +359,7 @@ export function BookingWizard() {
                   </div>
                 </Field>
 
-                <Field label="Duration (hours)" htmlFor="wiz-hours" hint={`Minimum ${minHours} hours`} required>
+                <Field label="Duration (hours)" htmlFor="wiz-hours" hint={`Minimum ${minHours} hour(s)`} required>
                   <input
                     id="wiz-hours" type="number" min={minHours} step={1}
                     className={inputClass}
@@ -435,7 +433,7 @@ export function BookingWizard() {
                 <Field label="Contact email" htmlFor="wiz-email" required hint="Used to look up your booking and receive confirmation.">
                   <input id="wiz-email" type="email" className={inputClass} value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
                 </Field>
-                <Field label="Contact phone (optional)" htmlFor="wiz-phone">
+                <Field label="Contact phone" htmlFor="wiz-phone" required hint="Required for urgent updates during your stay.">
                   <input id="wiz-phone" type="tel" className={inputClass} value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
                 </Field>
               </div>
@@ -443,7 +441,7 @@ export function BookingWizard() {
                 <Button variant="secondary" onClick={() => setStep(4)}>Back</Button>
                 <Button
                   onClick={() => setStep(6)}
-                  disabled={!guestName.trim() || !contactEmail.trim()}
+                  disabled={!guestName.trim() || !contactEmail.trim() || !contactPhone.trim()}
                 >
                   Review
                 </Button>
@@ -452,14 +450,15 @@ export function BookingWizard() {
           )}
 
           {step === 6 && (
-            <SectionCard title="Review and hold">
+            <SectionCard title="Review and Payment">
               <p className="text-sm text-muted">
-                Creating your booking hold reserves the space for a few minutes. Complete payment
-                before the timer runs out or the space will be released.
+                Your bed will only be reserved once your payment is successfully completed. 
+                Please review your details before proceeding.
               </p>
               <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                 <div><dt className="text-muted">Guest</dt><dd className="text-ink">{guestName}</dd></div>
                 <div><dt className="text-muted">Email</dt><dd className="text-ink">{contactEmail}</dd></div>
+                <div><dt className="text-muted">Phone</dt><dd className="text-ink">{contactPhone}</dd></div>
                 <div><dt className="text-muted">Check-in</dt><dd className="text-ink">{formatDateTime(startsAt)}</dd></div>
                 <div><dt className="text-muted">Checkout</dt><dd className="text-ink">{formatDateTime(endsAt)}</dd></div>
               </dl>
@@ -468,7 +467,7 @@ export function BookingWizard() {
               )}
               <div className="mt-6 flex justify-between">
                 <Button variant="secondary" onClick={() => setStep(5)} disabled={holdLoading}>Back</Button>
-                <Button onClick={handleCreateHold} loading={holdLoading}>Create hold and proceed</Button>
+                <Button onClick={handleCreateHold} loading={holdLoading}>Proceed to Payment</Button>
               </div>
             </SectionCard>
           )}
@@ -479,6 +478,9 @@ export function BookingWizard() {
                 Reference <span className="font-mono text-ink">{hold.reference}</span> — total{' '}
                 <span className="font-semibold text-ink">{formatINR(hold.total_paise)}</span>.
               </p>
+              <div className="mt-2 rounded-input border border-[#FBF0DC] bg-[#FBF0DC] p-3 text-xs text-[#8A5A00]">
+                Note: Your bed is not reserved yet. It will be assigned instantly upon successful payment.
+              </div>
               {confirmError && (
                 <div className="mt-4"><ErrorState message={confirmError} /></div>
               )}
@@ -503,7 +505,7 @@ export function BookingWizard() {
                 )}
               </div>
               <p className="mt-6 text-xs text-muted">
-                Hold expires at {formatDateTime(hold.expires_at)}.
+                This checkout session expires at {formatDateTime(hold.expires_at)}.
               </p>
             </SectionCard>
           )}
@@ -518,16 +520,15 @@ export function BookingWizard() {
                     Booking <span className="font-mono">{confirmedRow.reference}</span> is confirmed.
                   </p>
                   <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                    <div><dt className="text-muted">Status</dt><dd className="text-ink">Confirmed</dd></div>
+                    <div><dt className="text-muted">Status</dt><dd className="text-ink font-medium text-brand-900">Confirmed & Reserved</dd></div>
                     <div><dt className="text-muted">Check-in</dt><dd className="text-ink">{formatDateTime(confirmedRow.starts_at)}</dd></div>
                     <div><dt className="text-muted">Checkout</dt><dd className="text-ink">{formatDateTime(confirmedRow.ends_at)}</dd></div>
                   </dl>
                   <p className="mt-4 text-xs text-muted">
-                    Your exact sleeping space will be assigned by property staff at check-in.
-                    Bring government-issued photo ID.
+                    Your sleeping space has been reserved. Property staff will assign the exact bed at check-in.
+                    Please bring government-issued photo ID.
                   </p>
                   
-                  {/* Action Buttons */}
                   <div className="mt-6 flex flex-wrap gap-3">
                     {hold && (
                       <Link
@@ -604,7 +605,7 @@ function stepLabel(step: Step): string {
     3: 'Choose package',
     4: 'Check availability',
     5: 'Guest details',
-    6: 'Review and hold',
+    6: 'Review and pay',
     7: 'Payment',
     8: 'Confirmation',
   }[step];

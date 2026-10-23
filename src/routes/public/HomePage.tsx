@@ -152,7 +152,7 @@ export function HomePage() {
                 <input
                   id="home-hours"
                   type="number"
-                  min={section === 'ac_family_compartment' ? 24 : (s?.min_hourly_minutes ?? 120) / 60}
+                  min={section === 'ac_family_compartment' ? 24 : (s?.min_hourly_minutes ?? 60) / 60}
                   step={0.5}
                   className={inputClass}
                   value={section === 'ac_family_compartment' ? 24 : hours}
