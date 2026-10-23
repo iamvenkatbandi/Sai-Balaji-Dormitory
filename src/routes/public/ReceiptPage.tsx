@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react'; // <-- Import QR Code
+import { QRCodeCanvas } from 'qrcode.react';
 import { useAsync } from '../../lib/useAsync';
 import { getReceiptData } from '../../lib/queries';
 import { Spinner } from '../../components/Spinner';
@@ -12,6 +12,7 @@ export function ReceiptPage() {
   const { id = '' } = useParams();
   const data = useAsync(() => getReceiptData(id), [id]);
 
+  // Apply isolation class to body for perfect printing
   useEffect(() => {
     document.body.classList.add('print-isolate');
     return () => document.body.classList.remove('print-isolate');
@@ -21,6 +22,7 @@ export function ReceiptPage() {
   if (data.status === 'error') return <div className="p-12"><ErrorState message={data.error.message} /></div>;
 
   const { booking, guest_name, payments, property } = data.data;
+
   const totalPaid = payments.reduce((sum, p) => sum + p.amount_paise, 0);
   const isFullyPaid = totalPaid >= booking.total_paise;
   const balanceDue = booking.total_paise - totalPaid;
@@ -31,13 +33,17 @@ export function ReceiptPage() {
   return (
     <div className="min-h-screen bg-bg py-12 px-4 print:bg-white print:py-0 print:px-0">
       
+      {/* Action Buttons (Hidden when printing) */}
       <div className="mx-auto mb-6 flex max-w-3xl items-center justify-between print:hidden">
-        <Link to={-1 as any} className="text-sm font-medium text-brand-900 hover:underline">← Back</Link>
+        <Link to={-1 as any} className="text-sm font-medium text-brand-900 hover:underline">
+          ← Back
+        </Link>
         <div className="flex gap-3">
           <Button variant="secondary" onClick={() => window.print()}>Print / Save as PDF</Button>
         </div>
       </div>
 
+      {/* The A4 Receipt Area */}
       <div className="print-area mx-auto max-w-3xl rounded-card border border-line bg-surface p-8 shadow-card print:border-none print:shadow-none print:max-w-none">
         
         {/* Header */}
@@ -48,6 +54,7 @@ export function ReceiptPage() {
               {property.address_line && <p>{property.address_line}</p>}
               {property.phone && <p>Phone: {property.phone}</p>}
               {property.email && <p>Email: {property.email}</p>}
+              {!property.address_line && <p>Contact details pending.</p>}
             </div>
           </div>
           <div className="text-right">
@@ -127,13 +134,18 @@ export function ReceiptPage() {
         {/* Footer with Stamp and QR Code */}
         <div className="mt-12 flex justify-between items-end border-t border-line pt-6">
           <div className="flex items-center gap-6">
-            {/* QR Code */}
-            <div className="text-center">
-              <div className="rounded border border-line bg-white p-1.5">
-                <QRCodeSVG value={verifyUrl} size={80} />
-              </div>
-              <p className="mt-1 text-[10px] text-muted">Scan to verify</p>
+            
+            {/* QR Code Block */}
+            <div className="text-center print:block bg-white p-2 rounded border border-gray-200">
+              <QRCodeCanvas 
+                value={verifyUrl} 
+                size={90} 
+                level="M" 
+                includeMargin={true}
+              />
+              <p className="mt-1 text-[10px] font-medium text-muted uppercase tracking-wider">Scan to verify</p>
             </div>
+
             <div className="text-xs text-muted">
               <p>Thank you for choosing {property.name}.</p>
               <p className="mt-1">Please present this receipt at the reception during check-in.</p>
@@ -148,6 +160,7 @@ export function ReceiptPage() {
             {isFullyPaid ? 'Paid' : 'Pending'}
           </div>
         </div>
+
       </div>
     </div>
   );
