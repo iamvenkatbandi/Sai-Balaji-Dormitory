@@ -133,20 +133,20 @@ export async function processRefund(paymentId: string, amountPaise: number, reas
   return data as string;
 }
 
-export async function getOccupancyReport(fromIso: string, toIso: string): Promise<OccupancyReportRow[]> {
-  const { data, error } = await supabase.rpc('report_occupancy', { p_from: fromIso, p_to: toIso });
+export async function getOccupancyReport(fromDate: string, toDate: string): Promise<OccupancyReportRow[]> {
+  const { data, error } = await supabase.rpc('report_occupancy', { p_from: fromDate, p_to: toDate });
   if (error) throw await rpcError(error);
   return (data ?? []) as OccupancyReportRow[];
 }
 
-export async function getRevenueReport(fromIso: string, toIso: string): Promise<RevenueReportRow[]> {
-  const { data, error } = await supabase.rpc('report_revenue', { p_from: fromIso, p_to: toIso });
+export async function getRevenueReport(fromDate: string, toDate: string): Promise<RevenueReportRow[]> {
+  const { data, error } = await supabase.rpc('report_revenue', { p_from: fromDate, p_to: toDate });
   if (error) throw await rpcError(error);
   return (data ?? []) as RevenueReportRow[];
 }
 
-export async function getVolumeReport(fromIso: string, toIso: string): Promise<VolumeReportRow[]> {
-  const { data, error } = await supabase.rpc('report_booking_volume', { p_from: fromIso, p_to: toIso });
+export async function getVolumeReport(fromDate: string, toDate: string): Promise<VolumeReportRow[]> {
+  const { data, error } = await supabase.rpc('report_booking_volume', { p_from: fromDate, p_to: toDate });
   if (error) throw await rpcError(error);
   return (data ?? []) as VolumeReportRow[];
 }

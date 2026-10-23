@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar, Legend } from 'recharts';
 import { useAsync } from '../../lib/useAsync';
 import { getOccupancyReport, getRevenueReport, getVolumeReport } from '../../lib/admin';
@@ -16,6 +16,7 @@ export function AdminReportsPage() {
   });
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
 
+  // Pass YYYY-MM-DD directly to match the Postgres `date` type
   const occupancy = useAsync(() => getOccupancyReport(from, to), [from, to]);
   const revenue = useAsync(() => getRevenueReport(from, to), [from, to]);
   const volume = useAsync(() => getVolumeReport(from, to), [from, to]);
@@ -25,8 +26,12 @@ export function AdminReportsPage() {
       <PageHeader eyebrow="Analytics" title="Reports" />
 
       <div className="mb-4 flex flex-wrap items-end gap-3">
-        <Field label="From" htmlFor="rep-from"><input id="rep-from" type="date" className={inputClass} value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-        <Field label="To" htmlFor="rep-to"><input id="rep-to" type="date" className={inputClass} value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+        <Field label="From" htmlFor="rep-from">
+          <input id="rep-from" type="date" className={inputClass} value={from} onChange={(e) => setFrom(e.target.value)} />
+        </Field>
+        <Field label="To" htmlFor="rep-to">
+          <input id="rep-to" type="date" className={inputClass} value={to} onChange={(e) => setTo(e.target.value)} />
+        </Field>
       </div>
 
       <div className="grid gap-6">
