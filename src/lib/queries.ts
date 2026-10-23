@@ -207,3 +207,27 @@ export async function getLegalPolicy(slug: string): Promise<LegalPolicy | null> 
     handleFetchError(err);
   }
 }
+
+export interface PublicBed {
+  space_id: string;
+  code: string;
+  product_type: ProductType;
+  position: 'individual' | 'lower' | 'upper' | 'compartment_bed';
+  bunk_unit_code: string | null;
+  women_reserved: boolean;
+  is_available: boolean;
+}
+
+export async function getPublicBedMap(
+  sectionCode: 'AC' | 'NON_AC',
+  fromIso: string,
+  toIso: string
+): Promise<PublicBed[]> {
+  const { data, error } = await supabase.rpc('public_bed_map', {
+    p_section_code: sectionCode,
+    p_starts_at: fromIso,
+    p_ends_at: toIso,
+  });
+  if (error) throw error;
+  return (data ?? []) as PublicBed[];
+}
