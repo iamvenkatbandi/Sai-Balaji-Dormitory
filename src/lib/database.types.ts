@@ -315,15 +315,15 @@ export interface FamilyPolicyRow {
   effective_from: string | null;
 }
 
-export interface Settlement {
-  id: number;
+export interface SettlementRow {
+  id: string;
   settlement_id: string;
   amount: number;
   fees: number;
   tax: number;
   utr: string | null;
-  status: string;
-  created_at: string;
+  status: string | null;
+  created_at: string | null;
   recorded_at: string;
 }
 

@@ -39,6 +39,7 @@ import { AdminBedsPage } from './routes/admin/BedsPage';
 import { AdminBookingsPage } from './routes/admin/BookingsPage';
 import { AdminBookingDetailPage } from './routes/admin/BookingDetailPage';
 import { AdminReceptionPage } from './routes/admin/ReceptionPage';
+import { AdminFinancePage } from './routes/admin/FinancePage';
 import { AdminRatesPage } from './routes/admin/RatesPage';
 import { AdminSettingsPage } from './routes/admin/SettingsPage';
 import { AdminReportsPage } from './routes/admin/ReportsPage';
@@ -114,10 +115,11 @@ const router = createBrowserRouter([
           { path: 'beds', element: <AdminBedsPage /> },
           { path: 'bookings', element: <AdminBookingsPage /> },
           { path: 'bookings/:id', element: <AdminBookingDetailPage /> },
+          { path: 'finance', element: <AdminFinancePage /> },
+          { path: 'reports', element: <AdminReportsPage /> },
           { path: 'cleaning', element: <AdminCleaningPage /> },
           { path: 'maintenance', element: <AdminMaintenancePage /> },
           { path: 'washrooms', element: <AdminWashroomsPage /> },
-          { path: 'reports', element: <AdminReportsPage /> },
           { path: 'rates', element: <AdminRatesPage /> },
           { path: 'policies', element: <AdminPoliciesPage /> },
           { path: 'staff', element: <AdminStaffPage /> },

@@ -4,7 +4,7 @@ import type {
   BookingStatus, ProductType, RatePlanVersion, AdminBookingDetail,
   CleaningTask, FamilyPolicyRow, FinanceSummary, MaintenanceTicket,
   OccupancyReportRow, PaymentListRow, RevenueReportRow, RoleRow, StaffRow,
-  VolumeReportRow, WashroomArea, ProposedSpace, Settlement
+  VolumeReportRow, WashroomArea, ProposedSpace, SettlementRow,
 } from './database.types';
 
 async function rpcError(err: unknown): Promise<Error> {
@@ -373,13 +373,12 @@ export async function revokeWomenReserved(spaceIds: string[]): Promise<number> {
   return data as number;
 }
 
-export async function getSettlements(): Promise<Settlement[]> {
+export async function getSettlements(limit = 100): Promise<SettlementRow[]> {
   const { data, error } = await supabase
     .from('settlements')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(100);
-  
+    .limit(limit);
   if (error) throw await rpcError(error);
-  return (data ?? []) as Settlement[];
+  return (data ?? []) as SettlementRow[];
 }

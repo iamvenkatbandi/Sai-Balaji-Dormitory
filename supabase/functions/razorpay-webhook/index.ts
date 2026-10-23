@@ -14,12 +14,10 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-// Payload types for payment and settlement
 type RazorpayPayment = {
   id?: string;
   order_id?: string;
   amount?: number;
-  amount_paid?: number;
   notes?: { booking_id?: string };
 };
 
@@ -58,14 +56,11 @@ Deno.serve(async (req: Request) => {
   const supaUrl = Deno.env.get('SUPABASE_URL');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY');
   
-  if (!secret || !supaUrl || !serviceKey) {
-    return json({ error: 'server_misconfigured' }, 500);
-  }
+  if (!secret || !supaUrl || !serviceKey) return json({ error: 'server_misconfigured' }, 500);
 
   const body = await req.text();
   const signature = req.headers.get('x-razorpay-signature') ?? '';
 
-  // 1. Verify Signature
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret),
     { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
@@ -75,9 +70,7 @@ Deno.serve(async (req: Request) => {
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 
-  if (expectedHex !== signature) {
-    return json({ error: 'bad_signature' }, 400);
-  }
+  if (expectedHex !== signature) return json({ error: 'bad_signature' }, 400);
 
   let payload: WebhookPayload;
   try {
@@ -89,12 +82,10 @@ Deno.serve(async (req: Request) => {
   const event = payload.event as string;
   const supa = createClient(supaUrl, serviceKey);
 
-  // ── Handle Settlement Events ──────────────────────────────────────
+  // ── 1. Handle Settlements ──────────────────────────────────────
   if (event === 'settlement.processed') {
     const settlement = payload.payload?.settlement?.entity;
     if (settlement?.id) {
-      // Record the settlement details. The table 'settlements' is assumed to exist.
-      // Columns: settlement_id, amount, fees, tax, utr, status, created_at
       const { error: dbError } = await supa.from('settlements').upsert({
         settlement_id: settlement.id,
         amount: settlement.amount,
@@ -107,16 +98,14 @@ Deno.serve(async (req: Request) => {
 
       if (dbError) {
         console.error(`[Webhook] Failed to record settlement ${settlement.id}:`, dbError.message);
-        // Return 200 so Razorpay doesn't retry an event we cannot process
-        return json({ ok: false, error: dbError.message }, 200);
+      } else {
+        console.log(`[Webhook] Successfully recorded settlement ${settlement.id}`);
       }
-      console.log(`[Webhook] Successfully recorded settlement ${settlement.id}`);
-      return json({ ok: true });
     }
-    return json({ ok: false, error: 'missing_settlement_data' }, 400);
+    return json({ ok: true });
   }
 
-  // ── Handle Payment & Order Events (Existing Logic) ─────────────────
+  // ── 2. Handle Payments (Reserve Bed) ───────────────────────────
   if (!['payment.captured', 'order.paid', 'payment.authorized'].includes(event)) {
     return json({ ok: true, ignored: event });
   }
@@ -128,22 +117,13 @@ Deno.serve(async (req: Request) => {
   const orderId = payment?.order_id ?? order?.id;
   const amount = payment?.amount ?? order?.amount_paid ?? order?.amount;
 
-  if (!paymentId || !orderId) {
-    return json({ error: 'missing_payment_or_order_id' }, 400);
-  }
+  if (!paymentId || !orderId) return json({ error: 'missing_payment_or_order_id' }, 400);
 
   const eventId = payload.event_id ?? `${event}:${paymentId}`;
-
-  // Find the booking ID
   let bookingId = order?.notes?.booking_id ?? payment?.notes?.booking_id;
 
-  // Fallback: check our local mapping table
   if (!bookingId) {
-    const { data } = await supa
-      .from('razorpay_orders')
-      .select('booking_id')
-      .eq('order_id', orderId)
-      .maybeSingle();
+    const { data } = await supa.from('razorpay_orders').select('booking_id').eq('order_id', orderId).maybeSingle();
     bookingId = data?.booking_id;
   }
 
@@ -152,7 +132,6 @@ Deno.serve(async (req: Request) => {
     return json({ ok: false, error: 'booking_not_found' }, 200);
   }
 
-  // Confirm the booking in the database
   const { error } = await supa.rpc('confirm_booking_paid', {
     p_booking_id: bookingId,
     p_gateway_event_id: eventId,
