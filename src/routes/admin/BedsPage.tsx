@@ -5,7 +5,7 @@ import {
   getBedsStatus, getBedDetail, blockBed, releaseBlock,
   proposeWomenReserved, applyWomenReserved, assignBedManual,
   transferBooking, toggleBedActive, checkInBooking, checkOutBooking,
-  getUnassignedBookings // <-- New Import
+  getUnassignedBookings
 } from '../../lib/admin';
 import { supabase } from '../../lib/supabase';
 import type { AdminOutletContext } from '../../components/Guards';
@@ -175,7 +175,7 @@ export function AdminBedsPage() {
       {selected && (
         <BedDrawer
           spaceId={selected}
-          sectionCode={section} // Pass section to fetch correct bookings
+          sectionCode={section}
           canBlock={canBlock}
           canAssign={canAssign}
           canManage={canManage}
@@ -347,20 +347,36 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
 
               {/* CURRENT BOOKING ACTIONS */}
               {detail.data.current_booking && (
-                <div className="rounded-input border border-brand-100 bg-brand-100 p-4">
-                  <h3 className="text-sm font-semibold text-brand-900 mb-2">Current Booking Actions</h3>
-                  <div className="flex flex-wrap gap-2 mb-4">
+                <div className="rounded-input border border-[#E6F4ED] bg-[#E6F4ED] p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-bold text-[#2E7D5B]">Current Booking</h3>
+                    <span className="text-xs font-semibold uppercase px-2 py-0.5 rounded bg-white text-[#2E7D5B]">
+                      {detail.data.current_booking.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                  
+                  <div className="text-sm text-[#2E7D5B] mb-4 space-y-1">
+                    <p><strong>Ref:</strong> {detail.data.current_booking.reference}</p>
+                    <p><strong>Guest:</strong> {detail.data.current_booking.guest_name || '—'}</p>
+                    <p><strong>Dates:</strong> {formatDateTime(detail.data.current_booking.starts_at).split(',')[0]} to {formatDateTime(detail.data.current_booking.ends_at).split(',')[0]}</p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
                     {detail.data.current_booking.status === 'confirmed' && (
-                      <Button onClick={handleCheckIn} loading={working} className="bg-brand-900 text-white w-full sm:w-auto">Check In Guest</Button>
+                      <Button onClick={handleCheckIn} loading={working} className="bg-[#2E7D5B] text-white hover:bg-[#236346] w-full sm:w-auto">
+                        Check In Guest
+                      </Button>
                     )}
                     {detail.data.current_booking.status === 'checked_in' && (
-                      <Button onClick={handleCheckOut} loading={working} variant="secondary" className="w-full sm:w-auto">Check Out Guest</Button>
+                      <Button onClick={handleCheckOut} loading={working} variant="danger" className="w-full sm:w-auto">
+                        Check Out Guest
+                      </Button>
                     )}
                   </div>
                   
-                  <form onSubmit={handleTransfer} className="flex gap-2">
-                    <input className={`${inputClass} flex-1 bg-white`} placeholder="New Bed Code (e.g. AC-015)" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} required />
-                    <Button type="submit" loading={transferring} variant="secondary">Transfer Bed</Button>
+                  <form onSubmit={handleTransfer} className="mt-4 flex gap-2">
+                    <input className={`${inputClass} flex-1 bg-white`} placeholder="Transfer to Bed Code (e.g. AC-015)" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} required />
+                    <Button type="submit" loading={transferring} variant="secondary">Transfer</Button>
                   </form>
                 </div>
               )}
@@ -454,14 +470,6 @@ function BedDetailBody({ detail }: { detail: BedDetail }) {
         <div><dt className="text-muted">Zone</dt><dd className="text-ink">{s.zone_name}</dd></div>
         {s.women_reserved && <div><dt className="text-muted">Women-reserved</dt><dd className="text-ink">Yes</dd></div>}
       </dl>
-
-      {detail.current_booking && (
-        <div className="rounded-input border border-line bg-bg p-3">
-          <p className="text-xs uppercase text-muted">Current booking</p>
-          <p className="mt-1 font-mono text-sm text-ink">{detail.current_booking.reference}</p>
-          <p className="text-xs text-muted">{detail.current_booking.guest_name ?? '—'} · checkout {formatDateTime(detail.current_booking.ends_at)}</p>
-        </div>
-      )}
     </div>
   );
 }
