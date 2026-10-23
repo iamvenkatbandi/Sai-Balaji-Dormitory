@@ -123,3 +123,18 @@ export async function createRazorpayOrder(bookingId: string): Promise<RazorpayOr
   }
   return data as RazorpayOrder;
 }
+
+export async function verifyRazorpayPayment(
+  bookingId: string,
+  response: RazorpaySuccessResponse
+): Promise<void> {
+  const { error } = await supabase.functions.invoke('razorpay-verify', {
+    body: {
+      booking_id: bookingId,
+      razorpay_payment_id: response.razorpay_payment_id,
+      razorpay_order_id: response.razorpay_order_id,
+      razorpay_signature: response.razorpay_signature,
+    },
+  });
+  if (error) throw new Error(error.message ?? 'Payment verification failed.');
+}

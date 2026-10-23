@@ -8,6 +8,7 @@ import {
   isRazorpayConfigured,
   isDevManualConfirmAllowed,
   createRazorpayOrder,
+  verifyRazorpayPayment,
 } from '../../lib/razorpay';
 import { PageHeader } from '../../components/PageHeader';
 import { SectionCard } from '../../components/SectionCard';
@@ -150,11 +151,24 @@ export function BookingWizard() {
     setStep(8);
   }
 
-  async function handleDevConfirm() {
+    async function handleDevConfirm() {
     if (!hold) return;
+    
+    // 1. Show success UI immediately
+    setConfirmedRow({
+      reference: hold.reference,
+      status: 'confirmed',
+      starts_at: startsAt,
+      ends_at: endsAt,
+      product_type: product,
+      total_paise: hold.total_paise,
+    });
+    setConfirmState('confirmed');
+    setStep(8);
+
+    // 2. Update database in the background
     try {
       await devConfirmBooking(hold.booking_id);
-      await pollForConfirmation(hold.reference, contactEmail, 3);
     } catch (err) {
       setConfirmError(err instanceof Error ? err.message : 'Confirmation failed.');
       setConfirmState('error');
@@ -187,8 +201,26 @@ export function BookingWizard() {
         name: 'Sai Balaji Dormitory',
         description: `Booking ${hold.reference}`,
         prefill: { name: guestName, email: contactEmail, contact: contactPhone },
-        handler: () => {
-          pollForConfirmation(hold.reference, contactEmail);
+        handler: async (response) => {
+          // 1. Show success UI immediately (Optimistic)
+          setConfirmedRow({
+            reference: hold.reference,
+            status: 'confirmed',
+            starts_at: startsAt,
+            ends_at: endsAt,
+            product_type: product,
+            total_paise: hold.total_paise,
+          });
+          setConfirmState('confirmed');
+          setStep(8);
+
+          // 2. Verify in the background
+          try {
+            await verifyRazorpayPayment(hold.booking_id, response);
+          } catch (err) {
+            setConfirmError(err instanceof Error ? err.message : 'Payment verification failed.');
+            setConfirmState('error');
+          }
         },
         modal: {
           ondismiss: () => {
