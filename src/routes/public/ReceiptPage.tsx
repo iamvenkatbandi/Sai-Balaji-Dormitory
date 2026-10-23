@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import QRCode from 'react-qr-code';
+import { QRCodeSVG } from 'qrcode.react'; // Using the standard library
 import { useAsync } from '../../lib/useAsync';
 import { getReceiptData } from '../../lib/queries';
 import { Spinner } from '../../components/Spinner';
@@ -135,15 +135,18 @@ export function ReceiptPage() {
         <div className="mt-12 flex justify-between items-end border-t border-line pt-6">
           <div className="flex items-center gap-6">
             
-            {/* QR Code Block */}
-            <div className="text-center print:block bg-white p-2 rounded border border-gray-200">
-              <QRCode
-                size={90}
-                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                value={verifyUrl}
-                viewBox={`0 0 256 256`}
-              />
-              <p className="mt-1 text-[10px] font-medium text-muted uppercase tracking-wider">Scan to verify</p>
+            {/* QR Code Block - Explicitly sized to guarantee visibility */}
+            <div className="text-center">
+              <div className="flex h-[100px] w-[100px] items-center justify-center rounded border border-line bg-white p-1">
+                <QRCodeSVG 
+                  value={verifyUrl} 
+                  size={90} 
+                  bgColor={"#ffffff"}
+                  fgColor={"#173B35"}
+                  level={"M"}
+                />
+              </div>
+              <p className="mt-1.5 text-[10px] font-medium text-muted uppercase tracking-wider">Scan to verify</p>
             </div>
 
             <div className="text-xs text-muted">
