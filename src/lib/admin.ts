@@ -1,7 +1,10 @@
 import { supabase } from './supabase';
 import type {
   AdminBookingRow, AdminDashboardMetrics, BedDetail, BedRow, BedStatus,
-  BookingStatus, ProductType, RatePlanVersion, Settlement,
+  BookingStatus, ProductType, RatePlanVersion, AdminBookingDetail,
+  CleaningTask, FamilyPolicyRow, FinanceSummary, MaintenanceTicket,
+  OccupancyReportRow, PaymentListRow, RevenueReportRow, RoleRow, StaffRow,
+  VolumeReportRow, WashroomArea, ProposedSpace, Settlement
 } from './database.types';
 
 async function rpcError(err: unknown): Promise<Error> {
@@ -13,14 +16,10 @@ async function rpcError(err: unknown): Promise<Error> {
   return new Error('An unexpected error occurred.');
 }
 
-export async function getMyPermissions(): Promise<{ permissions: string[]; error: Error | null }> {
+export async function getMyPermissions(): Promise<string[]> {
   const { data, error } = await supabase.rpc('my_permissions');
-  if (error) {
-    const message = (error as { message?: string }).message ?? String(error);
-    return { permissions: [], error: new Error(message) };
-  }
-  const perms = Array.isArray(data) ? (data as string[]) : [];
-  return { permissions: perms, error: null };
+  if (error) return [];
+  return (data as string[]) ?? [];
 }
 
 export async function getDashboardMetrics(): Promise<AdminDashboardMetrics> {
@@ -49,9 +48,7 @@ export async function getBedDetail(spaceId: string): Promise<BedDetail> {
   return data as BedDetail;
 }
 
-export async function blockBed(
-  spaceId: string, fromIso: string, toIso: string, reason: string,
-): Promise<string> {
+export async function blockBed(spaceId: string, fromIso: string, toIso: string, reason: string): Promise<string> {
   const { data, error } = await supabase.rpc('admin_block_bed', {
     p_space_id: spaceId, p_from: fromIso, p_to: toIso, p_reason: reason,
   });
@@ -90,15 +87,165 @@ export async function getBookingsList(filters: {
   return (data ?? []) as AdminBookingRow[];
 }
 
-export async function getBookingDetail(id: string): Promise<{
-  booking: Record<string, unknown>;
-  guests: Array<Record<string, unknown>>;
-  payments: Array<{ id: string; amount_paise: number; status: string; gateway_payment_id: string | null; created_at: string }>;
-  spaces: Array<{ space_id: string; code: string; position: string }>;
-}> {
+export async function getBookingDetailFull(id: string): Promise<AdminBookingDetail> {
   const { data, error } = await supabase.rpc('admin_booking_detail', { p_booking_id: id });
   if (error) throw await rpcError(error);
-  return data as any;
+  return data as AdminBookingDetail;
+}
+
+export async function cancelBookingAdmin(id: string, reason: string | null): Promise<{
+  refund_paise: number; refund_percent: number;
+}> {
+  const { data, error } = await supabase.rpc('cancel_booking', { p_booking_id: id, p_reason: reason });
+  if (error) throw await rpcError(error);
+  const row = data as any;
+  if (!row?.ok) throw new Error(row?.error ?? 'Cancellation failed');
+  return { refund_paise: row.refund_paise, refund_percent: row.refund_percent };
+}
+
+export async function markNoShow(id: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_mark_no_show', { p_booking_id: id });
+  if (error) throw await rpcError(error);
+}
+
+export async function getFinanceSummary(fromIso: string, toIso: string): Promise<FinanceSummary> {
+  const { data, error } = await supabase.rpc('admin_finance_summary', { p_from: fromIso, p_to: toIso });
+  if (error) throw await rpcError(error);
+  return data as FinanceSummary;
+}
+
+export async function listPayments(filters: {
+  fromIso: string; toIso: string; status?: string | null; limit?: number;
+}): Promise<PaymentListRow[]> {
+  const { data, error } = await supabase.rpc('admin_list_payments', {
+    p_from: filters.fromIso, p_to: filters.toIso,
+    p_status: filters.status ?? null, p_limit: filters.limit ?? 100,
+  });
+  if (error) throw await rpcError(error);
+  return (data ?? []) as PaymentListRow[];
+}
+
+export async function processRefund(paymentId: string, amountPaise: number, reason: string): Promise<string> {
+  const { data, error } = await supabase.rpc('admin_process_refund', {
+    p_payment_id: paymentId, p_amount_paise: amountPaise, p_reason: reason,
+  });
+  if (error) throw await rpcError(error);
+  return data as string;
+}
+
+export async function getOccupancyReport(fromIso: string, toIso: string): Promise<OccupancyReportRow[]> {
+  const { data, error } = await supabase.rpc('report_occupancy', { p_from: fromIso, p_to: toIso });
+  if (error) throw await rpcError(error);
+  return (data ?? []) as OccupancyReportRow[];
+}
+
+export async function getRevenueReport(fromIso: string, toIso: string): Promise<RevenueReportRow[]> {
+  const { data, error } = await supabase.rpc('report_revenue', { p_from: fromIso, p_to: toIso });
+  if (error) throw await rpcError(error);
+  return (data ?? []) as RevenueReportRow[];
+}
+
+export async function getVolumeReport(fromIso: string, toIso: string): Promise<VolumeReportRow[]> {
+  const { data, error } = await supabase.rpc('report_booking_volume', { p_from: fromIso, p_to: toIso });
+  if (error) throw await rpcError(error);
+  return (data ?? []) as VolumeReportRow[];
+}
+
+export async function createMaintenance(input: {
+  title: string; description: string | null;
+  spaceId: string | null; bunkUnitId: string | null;
+  sectionId: string | null; priority: string;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc('admin_create_maintenance', {
+    p_title: input.title, p_description: input.description,
+    p_space_id: input.spaceId, p_bunk_unit_id: input.bunkUnitId,
+    p_section_id: input.sectionId, p_priority: input.priority,
+  });
+  if (error) throw await rpcError(error);
+  return data as string;
+}
+
+export async function resolveMaintenance(ticketId: string, note: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_resolve_maintenance', {
+    p_ticket_id: ticketId, p_note: note,
+  });
+  if (error) throw await rpcError(error);
+}
+
+export async function completeCleaning(taskId: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_complete_cleaning', { p_task_id: taskId });
+  if (error) throw await rpcError(error);
+}
+
+export async function listStaff(): Promise<StaffRow[]> {
+  const { data, error } = await supabase.rpc('admin_list_staff');
+  if (error) throw await rpcError(error);
+  return (data ?? []) as StaffRow[];
+}
+
+export async function listAllRoles(): Promise<RoleRow[]> {
+  const { data, error } = await supabase.rpc('admin_list_all_roles');
+  if (error) throw await rpcError(error);
+  return (data ?? []) as RoleRow[];
+}
+
+export async function findUserByEmail(email: string): Promise<{ user_id: string; email: string; full_name: string | null } | null> {
+  const { data, error } = await supabase.rpc('admin_find_user_by_email', { p_email: email });
+  if (error) throw await rpcError(error);
+  const row = Array.isArray(data) ? data[0] : data;
+  return row ?? null;
+}
+
+export async function assignRole(userId: string, roleCode: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_assign_role', {
+    p_user_id: userId, p_role_code: roleCode,
+  });
+  if (error) throw await rpcError(error);
+}
+
+export async function revokeRole(userId: string, roleCode: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_revoke_role', {
+    p_user_id: userId, p_role_code: roleCode,
+  });
+  if (error) throw await rpcError(error);
+}
+
+export async function getCurrentFamilyPolicy(): Promise<FamilyPolicyRow | null> {
+  const { data, error } = await supabase.rpc('admin_current_family_policy');
+  if (error) throw await rpcError(error);
+  return (data as FamilyPolicyRow | null) ?? null;
+}
+
+export async function publishFamilyPolicy(input: {
+  eligibility: string; relationships: string; verification: string;
+  evidence: string; checkinReview: string; escalation: string;
+  legalReviewed: boolean;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc('admin_publish_family_policy', {
+    p_eligibility: input.eligibility, p_relationships: input.relationships,
+    p_verification: input.verification, p_evidence: input.evidence,
+    p_checkin_review: input.checkinReview, p_escalation: input.escalation,
+    p_legal_reviewed: input.legalReviewed,
+  });
+  if (error) throw await rpcError(error);
+  return data as string;
+}
+
+export async function unpublishFamilyPolicy(): Promise<void> {
+  const { error } = await supabase.rpc('admin_unpublish_family_policy');
+  if (error) throw await rpcError(error);
+}
+
+export async function publishCancellationPolicy(input: {
+  freeCancelMinutes: number; outsidePct: number; insidePct: number; propertyPct: number;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc('admin_publish_cancellation_policy', {
+    p_free_cancel_minutes: input.freeCancelMinutes,
+    p_outside_pct: input.outsidePct, p_inside_pct: input.insidePct,
+    p_property_pct: input.propertyPct,
+  });
+  if (error) throw await rpcError(error);
+  return data as string;
 }
 
 export interface RatePlanWithVersion {
@@ -173,18 +320,18 @@ export async function publishRateVersion(planId: string, input: {
   if (iErr) throw await rpcError(iErr);
 }
 
+export async function getPropertyId(): Promise<string> {
+  const { data } = await supabase.from('property_contact').select('property_id').maybeSingle();
+  return (data as any)?.property_id ?? '';
+}
+
 export async function updateContact(input: {
   address_line: string | null; locality: string | null; region: string | null;
   postal_code: string | null; phone: string | null; email: string | null;
   map_url: string | null;
 }): Promise<void> {
-  const { error } = await supabase.from('property_contact').update(input).eq('property_id', input.phone === undefined ? '' : (await getPropertyId()));
+  const { error } = await supabase.from('property_contact').update(input).eq('property_id', await getPropertyId());
   if (error) throw await rpcError(error);
-}
-
-export async function getPropertyId(): Promise<string> {
-  const { data } = await supabase.from('property_contact').select('property_id').maybeSingle();
-  return (data as any)?.property_id ?? '';
 }
 
 export async function updateSettings(input: {
@@ -201,18 +348,7 @@ export async function updateSettings(input: {
   if (error) throw await rpcError(error);
 }
 
-export interface ProposedSpace {
-  space_id: string;
-  code: string;
-  product_type: ProductType;
-  bed_position: string;
-  rationale: string;
-}
-
-export async function proposeWomenReserved(
-  acTarget = 10,
-  naBunkTarget = 30,
-): Promise<ProposedSpace[]> {
+export async function proposeWomenReserved(acTarget = 10, naBunkTarget = 30): Promise<ProposedSpace[]> {
   const { data, error } = await supabase.rpc('admin_propose_women_reserved', {
     p_ac_target: acTarget,
     p_na_bunk_target: naBunkTarget,

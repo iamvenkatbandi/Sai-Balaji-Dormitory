@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 
-export function SectionCard({ title, subtitle, children, actions }: {
-  title: string; subtitle?: string; children: ReactNode; actions?: ReactNode;
+export function SectionCard({ title, subtitle, children, actions, className = '' }: {
+  title: string; subtitle?: string; children: ReactNode; actions?: ReactNode; className?: string;
 }) {
   return (
-    <section className="rounded-card border border-line bg-surface p-6 shadow-card">
+    <section className={`rounded-card border border-line bg-surface p-6 shadow-card ${className}`}>
       <header className="mb-4 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-ink">{title}</h2>

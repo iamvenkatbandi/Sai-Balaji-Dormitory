@@ -191,6 +191,130 @@ export interface AdminBookingRow {
   space_code: string | null;
 }
 
+export interface AdminBookingDetail {
+  booking: {
+    id: string; reference: string; status: BookingStatus; product_type: ProductType;
+    starts_at: string; ends_at: string; total_paise: number | null;
+    primary_contact_email: string | null; primary_contact_phone: string | null;
+    created_at: string;
+  };
+  guests: Array<{ id: string; full_name: string; gender: GuestGender; is_primary: boolean; age_years: number | null }>;
+  payments: Array<{ id: string; amount_paise: number; status: string; gateway_payment_id: string | null; created_at: string }>;
+  spaces: Array<{ space_id: string; code: string; position: string }>;
+}
+
+export interface WashroomArea {
+  id: string;
+  section_id: string;
+  name: string;
+  toilet_count: number | null;
+  basin_count: number | null;
+  shower_count: number | null;
+  notes: string | null;
+  last_inspection_at: string | null;
+  next_cleaning_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface MaintenanceTicket {
+  id: string;
+  title: string;
+  description: string | null;
+  space_id: string | null;
+  bunk_unit_id: string | null;
+  family_compartment_id: string | null;
+  section_id: string | null;
+  washroom_area_id: string | null;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  opened_by: string | null;
+  assigned_to: string | null;
+  resolution_note: string | null;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+}
+
+export interface CleaningTask {
+  id: string;
+  space_block_id: string;
+  space_id: string;
+  assigned_to: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | 'inspected';
+  checklist: unknown[];
+  completed_at: string | null;
+  inspected_at: string | null;
+  created_at: string;
+}
+
+export interface FinanceSummary {
+  collected_paise: number;
+  refunded_paise: number;
+  outstanding_paise: number;
+  failed_paise: number;
+  transaction_count: number;
+  net_paise: number;
+}
+
+export interface PaymentListRow {
+  id: string;
+  booking_id: string;
+  booking_reference: string;
+  guest_name: string | null;
+  amount_paise: number;
+  status: string;
+  gateway_payment_id: string | null;
+  created_at: string;
+}
+
+export interface StaffRow {
+  user_id: string;
+  email: string | null;
+  full_name: string | null;
+  roles: string[];
+  granted_at: string | null;
+}
+
+export interface RoleRow {
+  code: string;
+  name: string;
+}
+
+export interface OccupancyReportRow {
+  day: string;
+  occupied: number;
+  total: number;
+  occupancy_pct: number;
+}
+
+export interface RevenueReportRow {
+  day: string;
+  revenue_paise: number;
+  refunds_paise: number;
+  net_paise: number;
+}
+
+export interface VolumeReportRow {
+  day: string;
+  bookings: number;
+  cancellations: number;
+}
+
+export interface FamilyPolicyRow {
+  id: string;
+  version: number;
+  eligibility_criteria: string;
+  qualifying_relationships: string;
+  verification_process: string;
+  accepted_evidence: string;
+  checkin_review_process: string;
+  escalation_process: string;
+  legal_review_confirmed: boolean;
+  is_published: boolean;
+  effective_from: string | null;
+}
+
 export interface Settlement {
   id: number;
   settlement_id: string;
@@ -201,4 +325,12 @@ export interface Settlement {
   status: string;
   created_at: string;
   recorded_at: string;
+}
+
+export interface ProposedSpace {
+  space_id: string;
+  code: string;
+  product_type: ProductType;
+  position: string;
+  rationale: string;
 }
