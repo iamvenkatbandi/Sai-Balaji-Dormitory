@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import QRCode from 'react-qr-code';
 import { useAsync } from '../../lib/useAsync';
 import { getReceiptData } from '../../lib/queries';
 import { Spinner } from '../../components/Spinner';
@@ -10,7 +11,6 @@ import { formatDateTime, formatCurrencyINR } from '../../lib/format';
 export function ReceiptPage() {
   const { id = '' } = useParams();
   const data = useAsync(() => getReceiptData(id), [id]);
-  const qrRef = useRef<HTMLDivElement>(null);
 
   // Apply isolation class to body for perfect printing
   useEffect(() => {
@@ -18,32 +18,17 @@ export function ReceiptPage() {
     return () => document.body.classList.remove('print-isolate');
   }, []);
 
-  const { booking, guest_name, payments, property } = data.status === 'success' ? data.data : {} as any;
-
-  // Generate the verification URL
-  const verifyUrl = booking ? `${window.location.origin}/verify-receipt/${booking.id}` : '';
-
-  // Generate the QR Code once the data is loaded
-  useEffect(() => {
-    if (verifyUrl && qrRef.current && window.hasOwnProperty('QRCode')) {
-      qrRef.current.innerHTML = ''; // Clear previous
-      new (window as any).QRCode(qrRef.current, {
-        text: verifyUrl,
-        width: 110,
-        height: 110,
-        colorDark: "#173B35",
-        colorLight: "#ffffff",
-        correctLevel: (window as any).QRCode.CorrectLevel.H,
-      });
-    }
-  }, [verifyUrl]);
-
   if (data.status === 'loading') return <div className="p-12"><Spinner /></div>;
   if (data.status === 'error') return <div className="p-12"><ErrorState message={data.error.message} /></div>;
 
-  const totalPaid = payments.reduce((sum: number, p: any) => sum + p.amount_paise, 0);
+  const { booking, guest_name, payments, property } = data.data;
+
+  const totalPaid = payments.reduce((sum, p) => sum + p.amount_paise, 0);
   const isFullyPaid = totalPaid >= booking.total_paise;
   const balanceDue = booking.total_paise - totalPaid;
+
+  // The URL encoded in the QR code
+  const verifyUrl = `${window.location.origin}/verify-receipt/${booking.id}`;
 
   return (
     <div className="min-h-screen bg-bg py-12 px-4 print:bg-white print:py-0 print:px-0">
@@ -151,13 +136,14 @@ export function ReceiptPage() {
           <div className="flex items-center gap-6">
             
             {/* QR Code Block */}
-            <div className="text-center">
-              <div 
-                ref={qrRef} 
-                className="mx-auto overflow-hidden rounded border border-line bg-white p-1"
-                style={{ width: 110, height: 110 }}
+            <div className="text-center print:block bg-white p-2 rounded border border-gray-200">
+              <QRCode
+                size={90}
+                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                value={verifyUrl}
+                viewBox={`0 0 256 256`}
               />
-              <p className="mt-1.5 text-[10px] font-medium text-muted uppercase tracking-wider">Scan to verify</p>
+              <p className="mt-1 text-[10px] font-medium text-muted uppercase tracking-wider">Scan to verify</p>
             </div>
 
             <div className="text-xs text-muted">
