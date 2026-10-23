@@ -408,3 +408,27 @@ export async function toggleBedActive(spaceId: string, isActive: boolean): Promi
   });
   if (error) throw await rpcError(error);
 }
+
+export interface TransactionLedgerRow {
+  transaction_date: string;
+  booking_id: string;
+  reference: string;
+  guest_name: string;
+  product_type: string;
+  bed_code: string;
+  check_in: string;
+  check_out: string;
+  status: string;
+  amount_paid: number;
+  amount_refunded: number;
+  net_amount: number;
+}
+
+export async function getDetailedTransactions(fromIso: string, toIso: string): Promise<TransactionLedgerRow[]> {
+  const { data, error } = await supabase.rpc('admin_detailed_transactions', {
+    p_from: fromIso,
+    p_to: toIso,
+  });
+  if (error) throw await rpcError(error);
+  return (data ?? []) as TransactionLedgerRow[];
+}

@@ -1,51 +1,106 @@
-/* existing code... */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html { font-family: 'Inter', system-ui, sans-serif; font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; }
-body { @apply bg-bg text-ink antialiased; }
-input, select, textarea { font-variant-numeric: tabular-nums; }
+/* ── Global Screen Styles ───────────────────────────────────────── */
+html { 
+  font-family: 'Inter', system-ui, sans-serif; 
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; 
+}
+
+body { 
+  @apply bg-bg text-ink antialiased; 
+}
+
+input, select, textarea { 
+  font-variant-numeric: tabular-nums; 
+}
 
 /* ── A4 Print Styles ────────────────────────────────────────────── */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 12mm; /* Standard A4 margin */
   }
   
   body {
     background: white !important;
+    font-size: 11px !important; /* Slightly smaller text for dense reports */
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  /* Standard helper to hide UI elements */
-  .print-hidden {
+  /* 1. Hide UI elements that shouldn't be printed */
+  .print-hidden, 
+  .print\:hidden,
+  header.print-hidden, 
+  nav.print-hidden, 
+  button.print-hidden {
     display: none !important;
   }
 
-  /* Isolate a specific area for printing (used by the Receipt page) */
+  /* 2. Force layout containers to full width and remove backgrounds */
+  main, 
+  .min-h-screen, 
+  .mx-auto {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    display: block !important;
+  }
+
+  /* Remove shadows and borders from cards to save ink */
+  .rounded-card, 
+  .shadow-card {
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* 3. Table Formatting for Reports */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+
+  tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  thead {
+    display: table-header-group; /* Repeats table headers on every page */
+  }
+
+  th, td {
+    padding: 6px 4px !important;
+    border-bottom: 1px solid #E2E6E3 !important;
+  }
+
+  th {
+    background-color: #F7F8F7 !important; /* Force light gray background to print */
+    color: #202824 !important;
+    font-weight: 600 !important;
+  }
+
+  /* 4. Isolate specific areas (Used by the Receipt page) */
   body.print-isolate * {
     visibility: hidden;
   }
+  
   body.print-isolate .print-area,
   body.print-isolate .print-area * {
     visibility: visible;
   }
+  
   body.print-isolate .print-area {
     position: absolute;
     left: 0;
     top: 0;
     width: 100%;
-  }
-
-  /* Ensure tables don't break awkwardly */
-  tr {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  thead {
-    display: table-header-group;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }
