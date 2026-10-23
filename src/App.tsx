@@ -50,6 +50,7 @@ import { AdminWashroomsPage } from './routes/admin/WashroomsPage';
 import { AdminStaffPage } from './routes/admin/StaffPage';
 import { AdminPoliciesPage } from './routes/admin/PoliciesPage';
 import { AdminReceiptsPage } from './routes/admin/ReceiptsPage';
+import { ReportPrintPage } from './routes/admin/ReportPrintPage';
 
 import { ReceiptPage } from './routes/shared/ReceiptPage';
 
@@ -137,6 +138,8 @@ const router = createBrowserRouter([
           { path: 'receipt/:id', element: <ReceiptPage /> },
           { path: 'receipts', element: <AdminReceiptsPage /> },
           { path: 'receipt/:id', element: <ReceiptPage /> },
+          { path: 'reports', element: <AdminReportsPage /> },
+          { path: 'reports/print', element: <ReportPrintPage /> },
         ],
       },
     ],
