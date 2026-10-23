@@ -8,23 +8,44 @@ import { ErrorState } from '../../components/ErrorState';
 import { EmptyState } from '../../components/EmptyState';
 import { Button } from '../../components/Button';
 import { formatDateTime } from '../../lib/format';
+import type { CleaningTask } from '../../lib/database.types';
 
-interface Row {
-  id: string;
-  space_code: string;
-  section_code: string;
-  created_at: string;
+interface Row extends CleaningTask { 
+  space_code: string; 
+  section_code: string; 
 }
 
 async function loadTasks(): Promise<Row[]> {
-  // Query the view instead of the table or RPC
-  const { data, error } = await supabase
-    .from('view_cleaning_queue')
+  // 1. Fetch the tasks
+  const { data: tasks, error: tErr } = await supabase
+    .from('cleaning_tasks')
     .select('*')
+    .in('status', ['pending', 'in_progress'])
     .order('created_at', { ascending: true });
 
-  if (error) throw error;
-  return (data ?? []) as Row[];
+  if (tErr) throw tErr;
+  if (!tasks || tasks.length === 0) return [];
+
+  // 2. Fetch the corresponding spaces
+  const spaceIds = tasks.map((t) => t.space_id);
+  const { data: spaces, error: sErr } = await supabase
+    .from('sleeping_spaces')
+    .select('id, code, physical_zones(accommodation_sections(code))')
+    .in('id', spaceIds);
+
+  if (sErr) throw sErr;
+
+  // 3. Combine them
+  const spaceMap = new Map(spaces?.map((s: any) => [s.id, s]));
+  
+  return tasks.map((t) => {
+    const space: any = spaceMap.get(t.space_id);
+    return {
+      ...t,
+      space_code: space?.code ?? '—',
+      section_code: space?.physical_zones?.accommodation_sections?.code ?? '—',
+    } as Row;
+  });
 }
 
 export function AdminCleaningPage() {
