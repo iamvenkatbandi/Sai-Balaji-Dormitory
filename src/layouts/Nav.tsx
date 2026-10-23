@@ -20,13 +20,11 @@ export function Nav() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
     });
 
-    // Listen for sign in / sign out events
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       setLoading(false);
@@ -62,13 +60,6 @@ export function Nav() {
         </nav>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <Link
-            to="/book"
-            className="rounded-input bg-brand-900 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition"
-          >
-            Check availability
-          </Link>
-
           {loading ? (
             <div className="h-9 w-9 animate-pulse rounded-full bg-bg" />
           ) : session ? (
@@ -81,7 +72,7 @@ export function Nav() {
               {userInitial}
             </Link>
           ) : (
-            <Link to="/login" className="rounded-input px-3 py-2 text-sm text-ink hover:bg-bg transition">
+            <Link to="/login" className="rounded-input px-4 py-2 text-sm font-medium text-ink border border-line hover:bg-bg transition">
               Sign in
             </Link>
           )}
@@ -114,20 +105,12 @@ export function Nav() {
             ))}
           </ul>
 
-          <div className="mt-4 border-t border-line pt-4 flex items-center gap-2">
-            <Link
-              to="/book"
-              onClick={() => setOpen(false)}
-              className="flex-1 rounded-input bg-brand-900 px-3 py-2 text-center text-sm font-medium text-white"
-            >
-              Check availability
-            </Link>
-
+          <div className="mt-4 border-t border-line pt-4 flex items-center justify-end">
             {session ? (
               <Link
                 to="/portal"
                 onClick={() => setOpen(false)}
-                className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-full bg-brand-900 text-sm font-bold text-white hover:bg-brand-700 transition"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-900 text-sm font-bold text-white hover:bg-brand-700 transition"
                 title="Profile"
                 aria-label="Profile"
               >
@@ -137,7 +120,7 @@ export function Nav() {
               <Link
                 to="/login"
                 onClick={() => setOpen(false)}
-                className="flex-1 rounded-input border border-line px-3 py-2 text-center text-sm"
+                className="w-full rounded-input border border-line px-3 py-2 text-center text-sm font-medium text-ink hover:bg-bg"
               >
                 Sign in
               </Link>

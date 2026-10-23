@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAsync } from '../../lib/useAsync';
 import { getContact, getSettings } from '../../lib/queries';
+import { supabase } from '../../lib/supabase';
 import { PageHeader } from '../../components/PageHeader';
 import { SectionCard } from '../../components/SectionCard';
 import { Field, inputClass } from '../../components/Field';
@@ -17,13 +18,30 @@ export function ContactPage() {
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setState('sending');
-    // Enquiry submission is wired in a later phase alongside notifications.
-    // Until then, surface a clear, honest state rather than pretending it sent.
-    setTimeout(() => setState('error'), 400);
+    setErrorMsg(null);
+
+    try {
+      const { error } = await supabase.from('enquiries').insert({
+        name: name.trim(),
+        email: email.trim(),
+        message: message.trim(),
+      });
+
+      if (error) throw error;
+
+      setState('sent');
+      setName('');
+      setEmail('');
+      setMessage('');
+    } catch (err) {
+      setState('error');
+      setErrorMsg(err instanceof Error ? err.message : 'Could not send enquiry. Please try again.');
+    }
   }
 
   return (
@@ -61,6 +79,14 @@ export function ContactPage() {
               title="Enquiries are currently closed."
               body="The property is not accepting online enquiries at this time."
             />
+          ) : state === 'sent' ? (
+            <div className="rounded-input border border-[#E6F4ED] bg-[#E6F4ED] p-6 text-center">
+              <p className="font-semibold text-[#2E7D5B]">Enquiry sent successfully</p>
+              <p className="mt-1 text-sm text-[#2E7D5B]">Thank you. The property will get back to you soon.</p>
+              <Button variant="secondary" className="mt-4" onClick={() => setState('idle')}>
+                Send another message
+              </Button>
+            </div>
           ) : (
             <form onSubmit={onSubmit} className="space-y-4">
               <Field label="Your name" htmlFor="enq-name" required>
@@ -72,18 +98,12 @@ export function ContactPage() {
               <Field label="Message" htmlFor="enq-message" required>
                 <textarea id="enq-message" rows={4} className={inputClass} value={message} onChange={(e) => setMessage(e.target.value)} required />
               </Field>
-              <Button type="submit" loading={state === 'sending'} disabled={state === 'sent'}>
-                {state === 'sent' ? 'Enquiry sent' : 'Send enquiry'}
+              
+              {errorMsg && <p role="alert" className="text-sm text-[#B3261E]">{errorMsg}</p>}
+              
+              <Button type="submit" loading={state === 'sending'}>
+                Send enquiry
               </Button>
-              {state === 'error' && (
-                <p role="alert" className="text-sm text-[#B3261E]">
-                  Enquiry submission is not yet wired up. Please use the property’s verified contact
-                  details when they are published.
-                </p>
-              )}
-              {state === 'sent' && (
-                <p role="status" className="text-sm text-[#2E7D5B]">Thank you — the property will be in touch.</p>
-              )}
             </form>
           )}
         </SectionCard>
