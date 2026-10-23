@@ -19,6 +19,7 @@ const NAV: NavItem[] = [
   { to: '/admin/policies',        label: 'Policies',      perm: 'policies.manage' },
   { to: '/admin/staff',           label: 'Staff & roles', perm: 'staff.manage' },
   { to: '/admin/settings',        label: 'Settings',      perm: 'settings.manage' },
+  { to: '/admin/receipts',        label: 'Receipts',      perm: 'finance.read' },
 ];
 
 export function AdminLayout() {

@@ -21,6 +21,7 @@ import { BookingStatusPage } from './routes/public/BookingStatusPage';
 import { LegalPage } from './routes/public/LegalPage';
 import { BookingWizard } from './routes/public/BookingWizard';
 import { NotFoundPage } from './routes/public/NotFoundPage';
+import { VerifyReceiptPage } from './routes/public/VerifyReceiptPage';
 
 // Portal pages
 import { DashboardPage } from './routes/portal/DashboardPage';
@@ -48,6 +49,7 @@ import { AdminMaintenancePage } from './routes/admin/MaintenancePage';
 import { AdminWashroomsPage } from './routes/admin/WashroomsPage';
 import { AdminStaffPage } from './routes/admin/StaffPage';
 import { AdminPoliciesPage } from './routes/admin/PoliciesPage';
+import { AdminReceiptsPage } from './routes/admin/ReceiptsPage';
 
 import { ReceiptPage } from './routes/shared/ReceiptPage';
 
@@ -83,8 +85,10 @@ const router = createBrowserRouter([
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
       { path: 'legal/:slug', element: <LegalPage /> },
       { path: 'booking/status', element: <BookingStatusPage /> },
-      { path: 'booking/receipt/:id', element: <ReceiptPage /> }, // <-- ADD THIS
+      { path: 'booking/receipt/:id', element: <ReceiptPage /> },
       { path: 'login', element: <LoginPage /> },
+      { path: 'verify-receipt/:id', element: <VerifyReceiptPage /> },
+      { path: 'booking/receipt/:id', element: <ReceiptPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
@@ -130,6 +134,8 @@ const router = createBrowserRouter([
           { path: 'policies', element: <AdminPoliciesPage /> },
           { path: 'staff', element: <AdminStaffPage /> },
           { path: 'settings', element: <AdminSettingsPage /> },
+          { path: 'receipt/:id', element: <ReceiptPage /> },
+          { path: 'receipts', element: <AdminReceiptsPage /> },
           { path: 'receipt/:id', element: <ReceiptPage /> },
         ],
       },
