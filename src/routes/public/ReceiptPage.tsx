@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react'; // Using the standard library
 import { useAsync } from '../../lib/useAsync';
 import { getReceiptData } from '../../lib/queries';
 import { Spinner } from '../../components/Spinner';
@@ -27,8 +26,11 @@ export function ReceiptPage() {
   const isFullyPaid = totalPaid >= booking.total_paise;
   const balanceDue = booking.total_paise - totalPaid;
 
-  // The URL encoded in the QR code
+  // 1. Generate the verification URL
   const verifyUrl = `${window.location.origin}/verify-receipt/${booking.id}`;
+  
+  // 2. Generate the QR Code Image URL
+  const qrCodeImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`;
 
   return (
     <div className="min-h-screen bg-bg py-12 px-4 print:bg-white print:py-0 print:px-0">
@@ -135,17 +137,16 @@ export function ReceiptPage() {
         <div className="mt-12 flex justify-between items-end border-t border-line pt-6">
           <div className="flex items-center gap-6">
             
-            {/* QR Code Block - Explicitly sized to guarantee visibility */}
-            <div className="text-center">
-              <div className="flex h-[100px] w-[100px] items-center justify-center rounded border border-line bg-white p-1">
-                <QRCodeSVG 
-                  value={verifyUrl} 
-                  size={90} 
-                  bgColor={"#ffffff"}
-                  fgColor={"#173B35"}
-                  level={"M"}
-                />
-              </div>
+            {/* QR Code Block */}
+            <div className="text-center print:block bg-white p-2 rounded border border-gray-200">
+              <img 
+                src={qrCodeImageUrl} 
+                alt="Verification QR Code" 
+                width={90} 
+                height={90} 
+                style={{ width: '90px', height: '90px', display: 'block' }}
+                crossOrigin="anonymous"
+              />
               <p className="mt-1.5 text-[10px] font-medium text-muted uppercase tracking-wider">Scan to verify</p>
             </div>
 
