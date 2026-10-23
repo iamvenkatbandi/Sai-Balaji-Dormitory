@@ -370,6 +370,10 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
   const [transferring, setTransferring] = useState(false);
   const [working, setWorking] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
+  
+  // Cancellation state
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
   async function doBlock(e: React.FormEvent) {
@@ -431,15 +435,12 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
     finally { setWorking(false); }
   }
 
-  async function handleCancelReservation() {
+  async function executeCancel() {
     if (!activeBooking) return;
-    const reason = prompt('Enter cancellation reason (optional):');
-    if (reason === null) return; // User clicked cancel on the prompt
-    
     setCancelling(true);
     setErr(null);
     try {
-      await cancelBookingAdmin(activeBooking.id, reason);
+      await cancelBookingAdmin(activeBooking.id, cancelReason || 'Cancelled by admin');
       onChanged();
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : 'Cancellation failed');
@@ -482,29 +483,44 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
                       <p><strong>Dates:</strong> {formatDateTime(activeBooking.starts_at).split(',')[0]} to {formatDateTime(activeBooking.ends_at).split(',')[0]}</p>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      {activeBooking.status === 'confirmed' && (
-                        <Button onClick={handleCheckIn} loading={working} className="bg-[#2E7D5B] text-white hover:bg-[#236346] w-full sm:w-auto">
-                          Check In Guest
-                        </Button>
-                      )}
-                      {activeBooking.status === 'checked_in' && (
-                        <Button onClick={() => setShowBilling(true)} loading={working} variant="danger" className="w-full sm:w-auto">
-                          Check Out Guest
-                        </Button>
-                      )}
-                      
-                      {/* CANCEL RESERVATION BUTTON */}
-                      {(activeBooking.status === 'confirmed' || activeBooking.status === 'pending_payment' || activeBooking.status === 'pending_approval') && (
-                        <Button 
-                          onClick={handleCancelReservation} 
-                          loading={cancelling} 
-                          className="w-full sm:w-auto bg-[#FBEAE8] text-[#B3261E] border border-[#FBEAE8] hover:bg-[#F0C9C4] hover:border-[#F0C9C4]"
-                        >
-                          Cancel Reservation
-                        </Button>
-                      )}
-                    </div>
+                    {showCancelConfirm ? (
+                      <div className="mt-4 rounded border border-[#FBEAE8] bg-white p-3">
+                        <p className="text-sm font-semibold text-[#B3261E] mb-2">Are you sure you want to cancel?</p>
+                        <input 
+                          className={`${inputClass} mb-3 text-sm`} 
+                          placeholder="Cancellation reason (optional)" 
+                          value={cancelReason} 
+                          onChange={(e) => setCancelReason(e.target.value)} 
+                        />
+                        <div className="flex gap-2">
+                          <Button onClick={executeCancel} loading={cancelling} className="bg-[#B3261E] text-white hover:bg-[#8E1E18]">Confirm Cancel</Button>
+                          <Button variant="secondary" onClick={() => setShowCancelConfirm(false)}>Keep Reservation</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {activeBooking.status === 'confirmed' && (
+                          <Button onClick={handleCheckIn} loading={working} className="bg-[#2E7D5B] text-white hover:bg-[#236346] w-full sm:w-auto">
+                            Check In Guest
+                          </Button>
+                        )}
+                        {activeBooking.status === 'checked_in' && (
+                          <Button onClick={() => setShowBilling(true)} loading={working} variant="danger" className="w-full sm:w-auto">
+                            Check Out Guest
+                          </Button>
+                        )}
+                        
+                        {/* CANCEL RESERVATION BUTTON */}
+                        {(activeBooking.status === 'confirmed' || activeBooking.status === 'pending_payment' || activeBooking.status === 'pending_approval') && (
+                          <Button 
+                            onClick={() => setShowCancelConfirm(true)} 
+                            className="w-full sm:w-auto bg-[#FBEAE8] text-[#B3261E] border border-[#FBEAE8] hover:bg-[#F0C9C4] hover:border-[#F0C9C4]"
+                          >
+                            Cancel Reservation
+                          </Button>
+                        )}
+                      </div>
+                    )}
                     
                     <form onSubmit={handleTransfer} className="mt-4 flex gap-2">
                       <input className={`${inputClass} flex-1 bg-white`} placeholder="Transfer to Bed Code (e.g. AC-015)" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} required />
