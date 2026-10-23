@@ -5,7 +5,7 @@ import {
   getBedsStatus, getBedDetail, blockBed, releaseBlock,
   proposeWomenReserved, applyWomenReserved, assignBedManual,
   transferBooking, toggleBedActive, checkInBooking,
-  getUnassignedBookings
+  getUnassignedBookings, cancelBookingAdmin // <-- Added import
 } from '../../lib/admin';
 import { supabase } from '../../lib/supabase';
 import type { AdminOutletContext } from '../../components/Guards';
@@ -370,6 +370,7 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
   const [transferring, setTransferring] = useState(false);
   const [working, setWorking] = useState(false);
   const [showBilling, setShowBilling] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   async function doBlock(e: React.FormEvent) {
     e.preventDefault();
@@ -430,6 +431,23 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
     finally { setWorking(false); }
   }
 
+  async function handleCancelReservation() {
+    if (!activeBooking) return;
+    const reason = prompt('Enter cancellation reason (optional):');
+    if (reason === null) return; // User clicked cancel on the prompt
+    
+    setCancelling(true);
+    setErr(null);
+    try {
+      await cancelBookingAdmin(activeBooking.id, reason);
+      onChanged();
+    } catch (e2) {
+      setErr(e2 instanceof Error ? e2.message : 'Cancellation failed');
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -473,6 +491,17 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
                       {activeBooking.status === 'checked_in' && (
                         <Button onClick={() => setShowBilling(true)} loading={working} variant="danger" className="w-full sm:w-auto">
                           Check Out Guest
+                        </Button>
+                      )}
+                      
+                      {/* CANCEL RESERVATION BUTTON */}
+                      {(activeBooking.status === 'confirmed' || activeBooking.status === 'pending_payment' || activeBooking.status === 'pending_approval') && (
+                        <Button 
+                          onClick={handleCancelReservation} 
+                          loading={cancelling} 
+                          className="w-full sm:w-auto bg-white text-[#B3261E] border border-[#FBEAE8] hover:bg-[#FBEAE8]"
+                        >
+                          Cancel Reservation
                         </Button>
                       )}
                     </div>
