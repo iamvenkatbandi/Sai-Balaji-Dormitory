@@ -35,8 +35,9 @@ export function AdminLayout() {
   const visible = NAV.filter((n) => permissions.includes(n.perm));
 
   return (
-    <div className="min-h-screen bg-bg">
-      <header className="border-b border-line bg-surface">
+    <div className="min-h-screen bg-bg print:bg-white">
+      {/* Header - Hidden on Print */}
+      <header className="print-hidden border-b border-line bg-surface">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <Link to="/admin" className="flex items-center gap-2">
             <span aria-hidden className="grid h-8 w-8 place-items-center rounded-md bg-brand-900 text-sm font-semibold text-white">SB</span>
@@ -49,8 +50,10 @@ export function AdminLayout() {
           </div>
         </div>
       </header>
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 md:grid-cols-[220px_1fr]">
-        <nav aria-label="Admin" className="rounded-card border border-line bg-surface p-2 md:sticky md:top-6 md:self-start">
+
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 md:grid-cols-[220px_1fr] print:block print:max-w-none print:p-0">
+        {/* Sidebar - Hidden on Print */}
+        <nav aria-label="Admin" className="print-hidden rounded-card border border-line bg-surface p-2 md:sticky md:top-6 md:self-start">
           <ul className="flex flex-wrap gap-1 md:flex-col">
             {visible.map((item) => (
               <li key={item.to}>
@@ -65,7 +68,9 @@ export function AdminLayout() {
             ))}
           </ul>
         </nav>
-        <main className="min-w-0">
+        
+        {/* Main Content - Full width on Print */}
+        <main className="min-w-0 print:block print:w-full">
           <Outlet context={{ permissions } satisfies AdminOutletContext} />
         </main>
       </div>

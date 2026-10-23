@@ -8,3 +8,28 @@ html {
 }
 body { @apply bg-bg text-ink antialiased; }
 input, select, textarea { font-variant-numeric: tabular-nums; }
+
+/* ── A4 Print Styles ────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 15mm;
+  }
+  
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Hide elements that shouldn't be printed */
+  .print-hidden {
+    display: none !important;
+  }
+
+  /* Ensure charts and tables don't break across pages */
+  .print-break-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
