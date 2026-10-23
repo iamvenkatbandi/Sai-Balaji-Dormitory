@@ -391,3 +391,20 @@ export async function assignBedManual(bookingId: string, spaceId: string): Promi
   if (error) throw await rpcError(error);
   return data as string;
 }
+
+export async function transferBooking(bookingId: string, newSpaceId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('admin_transfer_booking', {
+    p_booking_id: bookingId,
+    p_new_space_id: newSpaceId,
+  });
+  if (error) throw await rpcError(error);
+  return data as string;
+}
+
+export async function toggleBedActive(spaceId: string, isActive: boolean): Promise<void> {
+  const { error } = await supabase.rpc('admin_toggle_bed_active', {
+    p_space_id: spaceId,
+    p_is_active: isActive,
+  });
+  if (error) throw await rpcError(error);
+}
