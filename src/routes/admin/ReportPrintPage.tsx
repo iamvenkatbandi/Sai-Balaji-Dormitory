@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAsync } from '../../lib/useAsync';
-import { getDetailedTransactions, type TransactionLedgerRow } from '../../lib/admin';
+import { getDetailedTransactions } from '../../lib/admin';
 import { Spinner } from '../../components/Spinner';
 import { ErrorState } from '../../components/ErrorState';
 import { Button } from '../../components/Button';
-import { formatDateTime, formatCurrencyINR } from '../../lib/format';
+import { formatCurrencyINR } from '../../lib/format';
 
 export function ReportPrintPage() {
   const [params] = useSearchParams();
@@ -17,7 +17,6 @@ export function ReportPrintPage() {
 
   const report = useAsync(() => getDetailedTransactions(fromIso, toIso), [fromIso, toIso]);
 
-  // Apply isolation class to body for perfect printing
   useEffect(() => {
     document.body.classList.add('print-isolate');
     return () => document.body.classList.remove('print-isolate');
@@ -64,7 +63,6 @@ export function ReportPrintPage() {
         <div className="flex items-start justify-between border-b-2 border-brand-900 pb-6">
           <div>
             <h1 className="text-3xl font-bold text-brand-900">Sai Balaji Dormitory</h1>
-            <h2 className="text-lg font-semibold text-ink mt-1">Transaction Ledger Report</h2>
             <p className="text-sm text-muted mt-1">Detailed record of all bookings and payments.</p>
           </div>
           <div className="text-right">
