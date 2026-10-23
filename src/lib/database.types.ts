@@ -213,6 +213,8 @@ export interface WashroomArea {
   notes: string | null;
   last_inspection_at: string | null;
   next_cleaning_at: string | null;
+  status: 'operational' | 'cleaning' | 'maintenance' | 'inactive';
+  last_cleaned_at: string | null;
   is_active: boolean;
   created_at: string;
 }
