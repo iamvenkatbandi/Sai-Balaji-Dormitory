@@ -1,11 +1,7 @@
 import { useMemo, useState } from 'react';
-import {
-  ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart
-} from 'recharts';
 import { useAsync } from '../../lib/useAsync';
 import { getOccupancyReport, getRevenueReport, getVolumeReport } from '../../lib/admin';
 import { PageHeader } from '../../components/PageHeader';
-import { SectionCard } from '../../components/SectionCard';
 import { Spinner } from '../../components/Spinner';
 import { ErrorState } from '../../components/ErrorState';
 import { Button } from '../../components/Button';
@@ -35,9 +31,6 @@ export function AdminReportsPage() {
   });
   const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
 
-  const fromIso = useMemo(() => new Date(`${from}T00:00:00`).toISOString(), [from]);
-  const toIso = useMemo(() => new Date(`${to}T23:59:59`).toISOString(), [to]);
-
   const occupancy = useAsync(() => getOccupancyReport(from, to), [from, to]);
   const revenue   = useAsync(() => getRevenueReport(from, to), [from, to]);
   const volume    = useAsync(() => getVolumeReport(from, to), [from, to]);
@@ -55,45 +48,76 @@ export function AdminReportsPage() {
     setTo(today.toISOString().slice(0, 10));
   }
 
-  // Calculate Summary KPIs
-  const summary = useMemo(() => {
-    let totalRevenue = 0;
-    let totalRefunds = 0;
-    let totalBookings = 0;
-    let totalOccupancy = 0;
-    let occupancyDays = 0;
-
-    if (revenue.status === 'success') {
-      revenue.data.forEach(r => {
-        totalRevenue += r.revenue_paise;
-        totalRefunds += r.refunds_paise;
-      });
-    }
-    if (volume.status === 'success') {
-      volume.data.forEach(v => { totalBookings += v.bookings; });
-    }
-    if (occupancy.status === 'success') {
-      occupancy.data.forEach(o => {
-        totalOccupancy += Number(o.occupancy_pct);
-        occupancyDays++;
-      });
+  // Merge data into a single daily ledger
+  const mergedReport = useMemo(() => {
+    if (revenue.status !== 'success' || occupancy.status !== 'success' || volume.status !== 'success') {
+      return [];
     }
 
-    return {
-      totalRevenue,
-      totalRefunds,
-      netRevenue: totalRevenue - totalRefunds,
-      totalBookings,
-      avgOccupancy: occupancyDays > 0 ? (totalOccupancy / occupancyDays).toFixed(1) : '0.0'
-    };
-  }, [revenue.status, volume.status, occupancy.status, revenue.data, volume.data, occupancy.data]);
+    const map = new Map<string, any>();
+
+    // Initialize with Revenue (ensures all dates from the report are included)
+    revenue.data.forEach(r => {
+      map.set(r.day, {
+        date: r.day,
+        collected: r.revenue_paise,
+        refunds: r.refunds_paise,
+        net: r.net_paise,
+        occupied: 0,
+        total_beds: 250,
+        occupancy_pct: 0,
+        bookings: 0,
+        cancellations: 0,
+      });
+    });
+
+    // Merge Occupancy
+    occupancy.data.forEach(o => {
+      const existing = map.get(o.day);
+      if (existing) {
+        existing.occupied = o.occupied;
+        existing.total_beds = o.total;
+        existing.occupancy_pct = o.occupancy_pct;
+      }
+    });
+
+    // Merge Volume
+    volume.data.forEach(v => {
+      const existing = map.get(v.day);
+      if (existing) {
+        existing.bookings = v.bookings;
+        existing.cancellations = v.cancellations;
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [revenue, occupancy, volume]);
+
+  // Calculate Totals for the Footer Row
+  const totals = useMemo(() => {
+    return mergedReport.reduce((acc, row) => ({
+      collected: acc.collected + row.collected,
+      refunds: acc.refunds + row.refunds,
+      net: acc.net + row.net,
+      bookings: acc.bookings + row.bookings,
+      cancellations: acc.cancellations + row.cancellations,
+      avgOccupancy: acc.avgOccupancy + Number(row.occupancy_pct),
+    }), { collected: 0, refunds: 0, net: 0, bookings: 0, cancellations: 0, avgOccupancy: 0 });
+  }, [mergedReport]);
+
+  const avgOcc = mergedReport.length > 0 
+    ? (totals.avgOccupancy / mergedReport.length).toFixed(1) 
+    : '0.0';
+
+  const isLoading = revenue.status === 'loading' || occupancy.status === 'loading' || volume.status === 'loading';
+  const isError = revenue.status === 'error' || occupancy.status === 'error' || volume.status === 'error';
 
   return (
     <>
       {/* ── Print Header (Only shows on A4) ──────────────────────── */}
       <div className="hidden print:block mb-8 border-b-2 border-brand-900 pb-4">
         <h1 className="text-3xl font-bold text-brand-900">Sai Balaji Dormitory</h1>
-        <h2 className="text-xl text-ink mt-1">Operational & Financial Report</h2>
+        <h2 className="text-xl text-ink mt-1">Daily Operations & Financial Ledger</h2>
         <div className="flex justify-between mt-4 text-sm text-muted">
           <p><strong>Period:</strong> {from} to {to}</p>
           <p><strong>Generated:</strong> {new Date().toLocaleString()}</p>
@@ -103,9 +127,12 @@ export function AdminReportsPage() {
       <PageHeader 
         eyebrow="Analytics" 
         title="Reports" 
-        intro="Track occupancy, revenue, and booking volume across custom date ranges."
+        intro="Track daily occupancy, revenue, and booking volume."
         actions={
           <div className="print-hidden flex gap-2">
+            <Button variant="secondary" onClick={() => downloadCSV(mergedReport, `ledger_${from}_to_${to}`)}>
+              Export CSV
+            </Button>
             <Button variant="secondary" onClick={() => window.print()}>Print / PDF</Button>
           </div>
         }
@@ -136,115 +163,90 @@ export function AdminReportsPage() {
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 print-break-avoid">
         <div className="rounded-card border border-line bg-surface p-5 shadow-card">
           <p className="text-xs font-medium uppercase tracking-wider text-muted">Net Revenue</p>
-          <p className="mt-2 text-2xl font-semibold text-brand-900">{formatCurrencyINR(summary.netRevenue)}</p>
-          <p className="mt-1 text-xs text-muted">Gross: {formatCurrencyINR(summary.totalRevenue)}</p>
+          <p className="mt-2 text-2xl font-semibold text-brand-900">{formatCurrencyINR(totals.net)}</p>
+          <p className="mt-1 text-xs text-muted">Gross: {formatCurrencyINR(totals.collected)}</p>
         </div>
         <div className="rounded-card border border-line bg-surface p-5 shadow-card">
           <p className="text-xs font-medium uppercase tracking-wider text-muted">Total Bookings</p>
-          <p className="mt-2 text-2xl font-semibold text-ink">{summary.totalBookings}</p>
-          <p className="mt-1 text-xs text-muted">Confirmed stays in period</p>
+          <p className="mt-2 text-2xl font-semibold text-ink">{totals.bookings}</p>
+          <p className="mt-1 text-xs text-muted">Cancellations: {totals.cancellations}</p>
         </div>
         <div className="rounded-card border border-line bg-surface p-5 shadow-card">
           <p className="text-xs font-medium uppercase tracking-wider text-muted">Avg Occupancy</p>
-          <p className="mt-2 text-2xl font-semibold text-ink">{summary.avgOccupancy}%</p>
-          <p className="mt-1 text-xs text-muted">Across all 250 spaces</p>
+          <p className="mt-2 text-2xl font-semibold text-ink">{avgOcc}%</p>
+          <p className="mt-1 text-xs text-muted">Across selected period</p>
         </div>
         <div className="rounded-card border border-line bg-surface p-5 shadow-card">
           <p className="text-xs font-medium uppercase tracking-wider text-muted">Total Refunds</p>
-          <p className="mt-2 text-2xl font-semibold text-[#B3261E]">{formatCurrencyINR(summary.totalRefunds)}</p>
+          <p className="mt-2 text-2xl font-semibold text-[#B3261E]">{formatCurrencyINR(totals.refunds)}</p>
           <p className="mt-1 text-xs text-muted">Processed in period</p>
         </div>
       </div>
 
-      {/* ── Charts ───────────────────────────────────────────────── */}
-      <div className="grid gap-6">
+      {/* ── The Report Table ─────────────────────────────────────── */}
+      <div className="rounded-card border border-line bg-surface shadow-card overflow-hidden">
+        {isLoading && <div className="p-8"><Spinner /></div>}
+        {isError && <div className="p-8"><ErrorState message="Failed to load report data." /></div>}
         
-        {/* Revenue Chart */}
-        <SectionCard 
-          title="Revenue & Refunds" 
-          subtitle="Daily breakdown of collected vs refunded amounts"
-          actions={<button onClick={() => revenue.status === 'success' && downloadCSV(revenue.data, `revenue_${from}_to_${to}`)} className="print-hidden text-xs font-medium text-brand-900 hover:underline">Export CSV</button>}
-        >
-          {revenue.status === 'loading' && <Spinner />}
-          {revenue.status === 'error' && <ErrorState message={revenue.error.message} />}
-          {revenue.status === 'success' && (
-            <div className="h-72 print-break-avoid">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={revenue.data.map((r) => ({
-                  day: r.day.slice(5), // MM-DD
-                  revenue: r.revenue_paise / 100,
-                  refunds: r.refunds_paise / 100,
-                  net: r.net_paise / 100,
-                }))} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid stroke="#E2E6E3" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#69736D' }} tickMargin={8} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#69736D' }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v}`} />
-                  <Tooltip formatter={(v: number) => formatCurrencyINR(v * 100)} cursor={{ fill: 'rgba(23, 59, 53, 0.04)' }} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                  <Bar dataKey="revenue" fill="#173B35" name="Collected" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                  <Bar dataKey="refunds" fill="#B3261E" name="Refunded" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                  <Line type="monotone" dataKey="net" stroke="#E8B86D" strokeWidth={2} dot={false} name="Net" />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </SectionCard>
+        {!isLoading && !isError && mergedReport.length === 0 && (
+          <div className="p-8 text-center text-muted">No data available for this period.</div>
+        )}
 
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Occupancy Chart */}
-          <SectionCard 
-            title="Occupancy %" 
-            subtitle="Percentage of beds filled"
-            actions={<button onClick={() => occupancy.status === 'success' && downloadCSV(occupancy.data, `occupancy_${from}_to_${to}`)} className="print-hidden text-xs font-medium text-brand-900 hover:underline">Export CSV</button>}
-          >
-            {occupancy.status === 'loading' && <Spinner />}
-            {occupancy.status === 'error' && <ErrorState message={occupancy.error.message} />}
-            {occupancy.status === 'success' && (
-              <div className="h-64 print-break-avoid">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={occupancy.data.map((r) => ({ ...r, day: r.day.slice(5) }))} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorOcc" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#173B35" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#173B35" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke="#E2E6E3" strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#69736D' }} tickMargin={8} axisLine={false} tickLine={false} />
-                    <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#69736D' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
-                    <Tooltip formatter={(v: number) => [`${v}%`, 'Occupancy']} cursor={{ stroke: '#173B35', strokeWidth: 1, strokeDasharray: '3 3' }} />
-                    <Area type="monotone" dataKey="occupancy_pct" stroke="#173B35" strokeWidth={2} fillOpacity={1} fill="url(#colorOcc)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </SectionCard>
-
-          {/* Volume Chart */}
-          <SectionCard 
-            title="Booking Volume" 
-            subtitle="New bookings vs cancellations"
-            actions={<button onClick={() => volume.status === 'success' && downloadCSV(volume.data, `volume_${from}_to_${to}`)} className="print-hidden text-xs font-medium text-brand-900 hover:underline">Export CSV</button>}
-          >
-            {volume.status === 'loading' && <Spinner />}
-            {volume.status === 'error' && <ErrorState message={volume.error.message} />}
-            {volume.status === 'success' && (
-              <div className="h-64 print-break-avoid">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={volume.data.map((r) => ({ ...r, day: r.day.slice(5) }))} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid stroke="#E2E6E3" strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#69736D' }} tickMargin={8} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 11, fill: '#69736D' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                    <Tooltip cursor={{ fill: 'rgba(23, 59, 53, 0.04)' }} />
-                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-                    <Bar dataKey="bookings" fill="#173B35" name="Bookings" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                    <Bar dataKey="cancellations" fill="#8A5A00" name="Cancellations" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </SectionCard>
-        </div>
+        {!isLoading && !isError && mergedReport.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-bg text-xs uppercase tracking-wide text-muted border-b border-line">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">#</th>
+                  <th className="px-4 py-3 font-semibold">Date</th>
+                  <th className="px-4 py-3 font-semibold text-right">Bookings</th>
+                  <th className="px-4 py-3 font-semibold text-right">Cancellations</th>
+                  <th className="px-4 py-3 font-semibold text-right">Occupancy</th>
+                  <th className="px-4 py-3 font-semibold text-right">Collected</th>
+                  <th className="px-4 py-3 font-semibold text-right">Refunds</th>
+                  <th className="px-4 py-3 font-semibold text-right">Net Revenue</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {mergedReport.map((row, index) => (
+                  <tr key={row.date} className="hover:bg-bg/50 transition">
+                    <td className="px-4 py-3 text-muted tabular-nums">{index + 1}</td>
+                    <td className="px-4 py-3 font-medium text-ink">
+                      {new Date(row.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{row.bookings}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{row.cancellations}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {row.occupied} / {row.total_beds} <span className="text-muted ml-1">({row.occupancy_pct}%)</span>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatCurrencyINR(row.collected)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[#B3261E]">
+                      {row.refunds > 0 ? `- ${formatCurrencyINR(row.refunds)}` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-brand-900">
+                      {formatCurrencyINR(row.net)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              {/* Footer Totals Row */}
+              <tfoot className="bg-bg font-semibold text-ink border-t-2 border-line">
+                <tr>
+                  <td className="px-4 py-3"></td>
+                  <td className="px-4 py-3">Total</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{totals.bookings}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{totals.cancellations}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{avgOcc}% (avg)</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatCurrencyINR(totals.collected)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-[#B3261E]">
+                    {totals.refunds > 0 ? `- ${formatCurrencyINR(totals.refunds)}` : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-brand-900">{formatCurrencyINR(totals.net)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
     </>
   );

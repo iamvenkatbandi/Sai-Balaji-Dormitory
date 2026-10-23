@@ -25,15 +25,14 @@ input, select, textarea { font-variant-numeric: tabular-nums; }
     display: none !important;
   }
 
-  /* Ensure charts and tables don't break across pages */
-  .print-break-avoid {
+  /* Ensure rows don't break across pages */
+  tr {
     break-inside: avoid;
     page-break-inside: avoid;
   }
   
-  /* Force charts to take full width */
-  .recharts-responsive-container {
-    width: 100% !important;
-    height: 300px !important;
+  /* Repeat table headers on every printed page */
+  thead {
+    display: table-header-group;
   }
 }
