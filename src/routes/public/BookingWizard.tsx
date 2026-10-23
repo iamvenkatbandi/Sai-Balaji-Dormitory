@@ -123,7 +123,6 @@ export function BookingWizard() {
         guestName, guestGender,
         contactEmail,
         contactPhone,
-        preferredSpaceId: selectedSpaceId, // Pass the selected bed
       });
       if (!res.ok) { setHoldError(res.detail ? `${res.error}: ${res.detail}` : res.error); return; }
       setHold(res);
