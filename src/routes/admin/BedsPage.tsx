@@ -52,19 +52,8 @@ export function AdminBedsPage() {
   const [showProposal, setShowProposal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Fetch data
   const allBeds = useAsync(() => getBedsStatus({}), [refreshKey]);
 
-  // Log data to console for debugging if it fails to render
-  useEffect(() => {
-    if (allBeds.status === 'success') {
-      console.log('Beds loaded:', allBeds.data.length);
-    } else if (allBeds.status === 'error') {
-      console.error('Error loading beds:', allBeds.error);
-    }
-  }, [allBeds]);
-
-  // Realtime listener
   useEffect(() => {
     const channel = supabase.channel('bed-inventory-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'space_blocks' }, () => setRefreshKey((k) => k + 1))
@@ -201,7 +190,7 @@ export function AdminBedsPage() {
   );
 }
 
-// ─── Unchanged subcomponents ───────────────────────────────────────
+// ─── Subcomponents ─────────────────────────────────────────────────
 function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) {
   const s = STATUS_STYLE[row.status];
   const title = `${row.code} — ${s.label}${row.current_booking_reference ? ` · ${row.current_booking_reference}` : ''}${row.women_reserved ? ' · women-reserved' : ''}`;
@@ -238,6 +227,310 @@ function CompactBunkCell({ row, letter, onClick }: { row: BedRow; letter: 'U' | 
   );
 }
 
-// (BedDrawer and ProposalModal remain exactly as they were in the previous step)
-function BedDrawer({ spaceId, canBlock, canAssign, canManage, onClose, onChanged }: any) { return null; }
-function ProposalModal({ onClose, onApplied }: any) { return null; }
+// ─── THE BED DRAWER (Operations Hub) ───────────────────────────────
+function BedDrawer({ spaceId, canBlock, canAssign, canManage, onClose, onChanged }: {
+  spaceId: string; canBlock: boolean; canAssign: boolean; canManage: boolean; onClose: () => void; onChanged: () => void;
+}) {
+  const detail = useAsync(() => getBedDetail(spaceId), [spaceId, onChanged]);
+
+  const [fromDate, setFromDate] = useState('');
+  const [fromHour, setFromHour] = useState('10');
+  const [fromMinute, setFromMinute] = useState('00');
+  const [fromPeriod, setFromPeriod] = useState<'AM' | 'PM'>('AM');
+  const [toDate, setToDate] = useState('');
+  const [toHour, setToHour] = useState('10');
+  const [toMinute, setToMinute] = useState('00');
+  const [toPeriod, setToPeriod] = useState<'AM' | 'PM'>('AM');
+  const [reason, setReason] = useState('');
+  
+  const [blocking, setBlocking] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [assignRef, setAssignRef] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [transferRef, setTransferRef] = useState('');
+  const [transferring, setTransferring] = useState(false);
+  const [working, setWorking] = useState(false);
+
+  function buildIso(dateStr: string, hourStr: string, minuteStr: string, period: 'AM' | 'PM') {
+    if (!dateStr) return '';
+    let h = parseInt(hourStr, 10);
+    if (period === 'PM' && h !== 12) h += 12;
+    if (period === 'AM' && h === 12) h = 0;
+    return new Date(`${dateStr}T${h.toString().padStart(2, '0')}:${minuteStr}:00`).toISOString();
+  }
+
+  async function doBlock(e: React.FormEvent) {
+    e.preventDefault();
+    if (!fromDate || !toDate) return;
+    const fromIso = buildIso(fromDate, fromHour, fromMinute, fromPeriod);
+    const toIso = buildIso(toDate, toHour, toMinute, toPeriod);
+    if (new Date(toIso) <= new Date(fromIso)) { setErr('End time must be after start time.'); return; }
+    setBlocking(true); setErr(null);
+    try { await blockBed(spaceId, fromIso, toIso, reason || 'Maintenance'); onChanged(); }
+    catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Block failed'); }
+    finally { setBlocking(false); }
+  }
+
+  async function doRelease(blockId: string) {
+    setBlocking(true); setErr(null);
+    try { await releaseBlock(blockId); onChanged(); }
+    catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Release failed'); }
+    finally { setBlocking(false); }
+  }
+
+  async function handleManualAssign(e: React.FormEvent) {
+    e.preventDefault();
+    setAssigning(true); setErr(null);
+    try {
+      const { data: booking } = await supabase.from('bookings').select('id').eq('reference', assignRef.trim().toUpperCase()).maybeSingle();
+      if (!booking) throw new Error('Booking reference not found');
+      await assignBedManual(booking.id, spaceId);
+      setAssignRef(''); onChanged();
+    } catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Assignment failed'); }
+    finally { setAssigning(false); }
+  }
+
+  async function handleTransfer(e: React.FormEvent) {
+    e.preventDefault();
+    if (!detail.data?.current_booking) return;
+    setTransferring(true); setErr(null);
+    try {
+      await transferBooking(detail.data.current_booking.id, spaceId);
+      setTransferRef(''); onChanged();
+    } catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Transfer failed'); }
+    finally { setTransferring(false); }
+  }
+
+  async function handleCheckIn() {
+    if (!detail.data?.current_booking) return;
+    setWorking(true); setErr(null);
+    try { await checkInBooking(detail.data.current_booking.id); onChanged(); }
+    catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Check-in failed'); }
+    finally { setWorking(false); }
+  }
+
+  async function handleCheckOut() {
+    if (!detail.data?.current_booking) return;
+    if (!confirm('Check out this guest?')) return;
+    setWorking(true); setErr(null);
+    try { await checkOutBooking(detail.data.current_booking.id); onChanged(); }
+    catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Check-out failed'); }
+    finally { setWorking(false); }
+  }
+
+  async function handleToggleActive() {
+    if (!detail.data) return;
+    const isActive = detail.data.space.is_active;
+    if (!confirm(isActive ? 'Permanently disable this bed? It will no longer be bookable.' : 'Enable this bed?')) return;
+    setWorking(true); setErr(null);
+    try { await toggleBedActive(spaceId, !isActive); onChanged(); }
+    catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Failed to toggle bed'); }
+    finally { setWorking(false); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-card bg-surface shadow-overlay" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
+          <h2 className="text-base font-semibold text-ink">Bed Operations</h2>
+          <button onClick={onClose} className="rounded-input p-1.5 text-muted hover:bg-bg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-6">
+          {detail.status === 'loading' && <Spinner />}
+          {detail.status === 'error' && <ErrorState message={detail.error.message} />}
+          
+          {detail.status === 'success' && (
+            <>
+              <BedDetailBody detail={detail.data} />
+
+              {detail.data.current_booking && (
+                <div className="rounded-input border border-brand-100 bg-brand-100 p-4">
+                  <h3 className="text-sm font-semibold text-brand-900 mb-2">Current Booking Actions</h3>
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {detail.data.current_booking.status === 'confirmed' && (
+                      <Button onClick={handleCheckIn} loading={working} className="bg-brand-900 text-white">Check In Guest</Button>
+                    )}
+                    {detail.data.current_booking.status === 'checked_in' && (
+                      <Button onClick={handleCheckOut} loading={working} variant="secondary">Check Out Guest</Button>
+                    )}
+                  </div>
+                  
+                  <form onSubmit={handleTransfer} className="flex gap-2">
+                    <input className={`${inputClass} flex-1 bg-white`} placeholder="New Bed Code (e.g. AC-015)" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} required />
+                    <Button type="submit" loading={transferring} variant="secondary">Transfer Bed</Button>
+                  </form>
+                </div>
+              )}
+
+              {canAssign && !detail.data.current_booking && (
+                <div className="border-t border-line pt-4">
+                  <h3 className="text-sm font-semibold text-ink">Assign Booking</h3>
+                  <form onSubmit={handleManualAssign} className="mt-2 flex gap-2">
+                    <input className={`${inputClass} flex-1`} placeholder="e.g. SB-20231025-A1B2C3" value={assignRef} onChange={(e) => setAssignRef(e.target.value)} required />
+                    <Button type="submit" loading={assigning}>Assign</Button>
+                  </form>
+                </div>
+              )}
+
+              {canManage && (
+                <div className="border-t border-line pt-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-ink">Bed Status</h3>
+                    <p className="text-xs text-muted">Take this bed offline permanently.</p>
+                  </div>
+                  <Button variant={detail.data.space.is_active ? 'danger' : 'primary'} onClick={handleToggleActive} loading={working}>
+                    {detail.data.space.is_active ? 'Disable Bed' : 'Enable Bed'}
+                  </Button>
+                </div>
+              )}
+
+              {canBlock && (
+                <div className="border-t border-line pt-4">
+                  <h3 className="text-sm font-semibold text-ink mb-2">Block for Maintenance</h3>
+                  <form onSubmit={doBlock} className="space-y-3">
+                    <div className="flex gap-2">
+                      <input type="date" className={`${inputClass} flex-1`} value={fromDate} onChange={(e) => setFromDate(e.target.value)} required />
+                      <input type="date" className={`${inputClass} flex-1`} value={toDate} onChange={(e) => setToDate(e.target.value)} required />
+                    </div>
+                    <input className={inputClass} placeholder="Reason (e.g. Broken fan)" value={reason} onChange={(e) => setReason(e.target.value)} />
+                    <Button type="submit" loading={blocking} variant="secondary">Create Block</Button>
+                  </form>
+                  {detail.data.maintenance_history.length > 0 && (
+                    <ul className="mt-3 space-y-1 text-sm">
+                      {detail.data.maintenance_history.map((b) => (
+                        <li key={b.id} className="flex justify-between border border-line p-2 rounded bg-bg">
+                          <span>{formatDateTime(b.blocked_from).split(',')[0]} to {formatDateTime(b.blocked_to).split(',')[0]}</span>
+                          <button onClick={() => doRelease(b.id)} className="text-xs text-brand-900 hover:underline">Release</button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {err && <p role="alert" className="text-sm text-[#B3261E]">{err}</p>}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BedDetailBody({ detail }: { detail: BedDetail }) {
+  const s = detail.space;
+  return (
+    <div className="space-y-4">
+      <dl className="grid gap-2 text-sm sm:grid-cols-2">
+        <div><dt className="text-muted">Bed ID</dt><dd className="font-mono text-ink">{s.code}</dd></div>
+        <div><dt className="text-muted">Section</dt><dd className="text-ink">{s.section_code === 'AC' ? 'AC Hall' : 'Non-AC Hall'}</dd></div>
+        <div><dt className="text-muted">Position</dt><dd className="text-ink capitalize">{s.position}</dd></div>
+        <div><dt className="text-muted">Zone</dt><dd className="text-ink">{s.zone_name}</dd></div>
+        {s.women_reserved && <div><dt className="text-muted">Women-reserved</dt><dd className="text-ink">Yes</dd></div>}
+      </dl>
+
+      {detail.current_booking && (
+        <div className="rounded-input border border-line bg-bg p-3">
+          <p className="text-xs uppercase text-muted">Current booking</p>
+          <p className="mt-1 font-mono text-sm text-ink">{detail.current_booking.reference}</p>
+          <p className="text-xs text-muted">{detail.current_booking.guest_name ?? '—'} · checkout {formatDateTime(detail.current_booking.ends_at)}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── THE PROPOSAL MODAL ───────────────────────────────────────────
+function ProposalModal({ onClose, onApplied }: { onClose: () => void; onApplied: () => void }) {
+  const proposal = useAsync(() => proposeWomenReserved(10, 30), []);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const acProposal = proposal.status === 'success' ? proposal.data.filter((p) => p.product_type === 'ac_individual') : [];
+  const naProposal = proposal.status === 'success' ? proposal.data.filter((p) => p.product_type === 'non_ac_space') : [];
+  const naBunkCount = new Set(naProposal.map((p) => p.code.replace(/-[LU]$/, ''))).size;
+
+  async function apply() {
+    if (proposal.status !== 'success' || proposal.data.length === 0) return;
+    setApplying(true);
+    setErr(null);
+    try {
+      await applyWomenReserved(proposal.data.map((p) => p.space_id));
+      onApplied();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed to apply');
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-card bg-surface shadow-overlay" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
+          <h2 className="text-base font-semibold text-ink">Women-reserved proposal</h2>
+          <button onClick={onClose} aria-label="Close" className="rounded-input p-1.5 text-muted hover:bg-bg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <div className="rounded-input border border-[#FBEAE8] bg-[#FBEAE8] p-3 text-sm text-[#7A1A15]">
+            <strong>This is a starting proposal, not a safety claim.</strong> It selects low-numbered beds for review. Verify against the physical layout before confirming.
+          </div>
+
+          {proposal.status === 'loading' && <Spinner />}
+          {proposal.status === 'error' && <ErrorState message={proposal.error.message} />}
+          {proposal.status === 'success' && proposal.data.length === 0 && (
+            <EmptyState title="Nothing to add." body={`Designation is already at or above the target of 10 AC beds and 30 Non-AC bunk units.`} />
+          )}
+
+          {proposal.status === 'success' && proposal.data.length > 0 && (
+            <>
+              <div>
+                <p className="text-sm font-semibold text-ink">Proposed additions ({proposal.data.length} spaces)</p>
+                <p className="text-xs text-muted">{acProposal.length} AC individual beds · {naBunkCount} Non-AC bunk units ({naProposal.length} spaces)</p>
+              </div>
+
+              {acProposal.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted">AC individual beds</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {acProposal.map((p) => <span key={p.space_id} className="rounded border border-line bg-bg px-2 py-0.5 font-mono text-xs text-ink">{p.code}</span>)}
+                  </div>
+                </div>
+              )}
+
+              {naProposal.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted">Non-AC bunk units</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {Array.from(new Set(naProposal.map((p) => p.code.replace(/-[LU]$/, '')))).sort().map((unit) => (
+                      <span key={unit} className="rounded border border-line bg-bg px-2 py-0.5 font-mono text-xs text-ink">{unit}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <label className="flex items-start gap-2 rounded-input border border-line bg-bg p-3 text-sm text-ink">
+                <input type="checkbox" className="mt-1" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
+                <span>I have verified the physical layout of these beds, confirmed they meet the property's safety requirements, and accept responsibility for this designation.</span>
+              </label>
+
+              {err && <p role="alert" className="text-sm text-[#B3261E]">{err}</p>}
+            </>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-surface px-5 py-3">
+          <Button variant="secondary" onClick={onClose} disabled={applying}>Cancel</Button>
+          <Button onClick={apply} loading={applying} disabled={!acknowledged || proposal.status !== 'success' || proposal.data.length === 0}>Apply designation</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
