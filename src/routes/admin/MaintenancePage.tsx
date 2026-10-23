@@ -78,15 +78,33 @@ function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
     setSaving(true); setErr(null);
     try {
       let spaceId: string | null = null;
+      let sectionId: string | null = null;
+
+      // If a specific bed is provided, attach it
       if (spaceCode.trim()) {
         const { data } = await supabase.from('sleeping_spaces').select('id').eq('code', spaceCode.trim()).maybeSingle();
         if (!data) throw new Error(`Space ${spaceCode} not found`);
         spaceId = (data as { id: string }).id;
+      } else {
+        // If no bed is provided, we MUST attach a section to satisfy the database constraint
+        const { data } = await supabase.from('accommodation_sections').select('id').eq('code', 'AC').maybeSingle();
+        if (data) sectionId = data.id;
       }
-      await createMaintenance({ title, description: description || null, spaceId, bunkUnitId: null, sectionId: null, priority });
+
+      await createMaintenance({ 
+        title, 
+        description: description || null, 
+        spaceId, 
+        bunkUnitId: null, 
+        sectionId, 
+        priority 
+      });
       onDone();
-    } catch (e) { setErr(e instanceof Error ? e.message : 'Create failed'); } 
-    finally { setSaving(false); }
+    } catch (e) { 
+      setErr(e instanceof Error ? e.message : 'Create failed'); 
+    } finally { 
+      setSaving(false); 
+    }
   }
 
   return (
@@ -96,7 +114,7 @@ function CreateDialog({ onClose, onDone }: { onClose: () => void; onDone: () => 
         <div className="mt-4 space-y-3">
           <Field label="Title" htmlFor="mt-title" required><input id="mt-title" className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} required /></Field>
           <Field label="Description" htmlFor="mt-desc"><textarea id="mt-desc" rows={3} className={inputClass} value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
-          <Field label="Affected space code" htmlFor="mt-space" hint="e.g. AC-014. Leave blank if not space-specific."><input id="mt-space" className={inputClass} value={spaceCode} onChange={(e) => setSpaceCode(e.target.value)} /></Field>
+          <Field label="Affected space code" htmlFor="mt-space" hint="e.g. AC-014. Leave blank for a general AC Hall issue."><input id="mt-space" className={inputClass} value={spaceCode} onChange={(e) => setSpaceCode(e.target.value)} /></Field>
           <Field label="Priority" htmlFor="mt-prio" required>
             <select id="mt-prio" className={inputClass} value={priority} onChange={(e) => setPriority(e.target.value as typeof priority)}>
               <option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option>
