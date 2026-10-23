@@ -8,6 +8,14 @@ import { Field, inputClass } from '../../components/Field';
 import { Button } from '../../components/Button';
 import { NotConfiguredNotice } from '../../components/NotConfiguredNotice';
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) {
+    return String((err as any).message);
+  }
+  return 'Could not send enquiry. Please try again.';
+}
+
 export function ContactPage() {
   const contact = useAsync(getContact, []);
   const settings = useAsync(getSettings, []);
@@ -40,7 +48,7 @@ export function ContactPage() {
       setMessage('');
     } catch (err) {
       setState('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Could not send enquiry. Please try again.');
+      setErrorMsg(getErrorMessage(err));
     }
   }
 
