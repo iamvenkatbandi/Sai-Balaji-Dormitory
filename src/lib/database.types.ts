@@ -346,3 +346,33 @@ export interface WashroomFixture {
   last_cleaned_at: string | null;
   created_at: string;
 }
+
+export interface LegalPolicy {
+  slug: string;
+  title: string;
+  content: string;
+  is_published: boolean;
+  updated_at: string;
+}
+
+export interface LegalPolicy {
+  slug: string;
+  title: string;
+  content: string;
+  is_published: boolean;
+  updated_at: string;
+}
+
+export interface FamilyPolicy {
+  id: string;
+  version: number;
+  is_published: boolean;
+  effective_from: string | null;
+  eligibility_criteria: string | null;
+  qualifying_relationships: string | null;
+  verification_process: string | null;
+  accepted_evidence: string | null;
+  checkin_review_process: string | null;
+  escalation_process: string | null;
+  legal_review_confirmed: boolean;
+}

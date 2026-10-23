@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from './supabase';
 import type {
   PropertyContact, PropertySettings, RatePlan, RatePlanVersion,
   FamilyPolicy, CancellationPolicy, BookingStatusRow, ProductType,
+  LegalPolicy,
 } from './database.types';
 
 function assertConfigured() {
@@ -72,7 +73,7 @@ export async function getActiveFamilyPolicy(): Promise<FamilyPolicy | null> {
   try {
     const { data, error } = await supabase
       .from('family_policies')
-      .select('id,is_published,effective_from')
+      .select('*') // Changed from specific columns to * to fetch full policy text
       .eq('is_published', true)
       .order('effective_from', { ascending: false })
       .limit(1)
@@ -161,6 +162,8 @@ export interface ReceiptData {
     starts_at: string;
     ends_at: string;
     total_paise: number;
+    final_total_paise: number | null;
+    extra_charges_paise: number | null;
     product_type: string;
     primary_contact_email: string | null;
     primary_contact_phone: string | null;
@@ -187,4 +190,20 @@ export async function getReceiptData(bookingId: string): Promise<ReceiptData> {
   });
   if (error) throw error;
   return data as ReceiptData;
+}
+
+export async function getLegalPolicy(slug: string): Promise<LegalPolicy | null> {
+  assertConfigured();
+  try {
+    const { data, error } = await supabase
+      .from('legal_policies')
+      .select('*')
+      .eq('slug', slug)
+      .eq('is_published', true)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as LegalPolicy | null) ?? null;
+  } catch (err) {
+    handleFetchError(err);
+  }
 }
