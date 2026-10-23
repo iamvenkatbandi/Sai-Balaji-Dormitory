@@ -17,8 +17,12 @@ interface Row {
 }
 
 async function loadTasks(): Promise<Row[]> {
-  // Use the RPC instead of querying the table directly
-  const { data, error } = await supabase.rpc('get_cleaning_tasks');
+  // Query the view instead of the table or RPC
+  const { data, error } = await supabase
+    .from('view_cleaning_queue')
+    .select('*')
+    .order('created_at', { ascending: true });
+
   if (error) throw error;
   return (data ?? []) as Row[];
 }
