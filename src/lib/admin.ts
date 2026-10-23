@@ -486,3 +486,36 @@ export async function processCheckout(bookingId: string, actualCheckoutTime: str
   });
   if (error) throw await rpcError(error);
 }
+
+export interface OutstandingDue {
+  booking_id: string;
+  reference: string;
+  guest_name: string;
+  total_paise: number;
+  paid_paise: number;
+  due_paise: number;
+}
+
+export async function getOutstandingDues(): Promise<OutstandingDue[]> {
+  const { data, error } = await supabase.rpc('admin_get_outstanding_dues');
+  if (error) throw await rpcError(error);
+  return data as OutstandingDue[];
+}
+
+export interface RefundRecord {
+  id: string;
+  booking_id: string;
+  reference: string;
+  guest_name: string;
+  amount_paise: number;
+  reason: string | null;
+  status: string;
+  created_at: string;
+  processed_at: string | null;
+}
+
+export async function getRefundHistory(): Promise<RefundRecord[]> {
+  const { data, error } = await supabase.rpc('admin_get_refunds');
+  if (error) throw await rpcError(error);
+  return data as RefundRecord[];
+}
