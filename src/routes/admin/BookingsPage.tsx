@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAsync } from '../../lib/useAsync';
 import { getBookingsList } from '../../lib/admin';
 import { PageHeader } from '../../components/PageHeader';
@@ -59,7 +60,11 @@ export function AdminBookingsPage() {
             <tbody>
               {list.data.map((b) => (
                 <tr key={b.id} className="border-t border-line">
-                  <td className="px-4 py-3 font-mono">{b.reference}</td>
+                  <td className="px-4 py-3 font-mono">
+                    <Link to={`/admin/bookings/${b.id}`} className="text-brand-900 hover:underline">
+                      {b.reference}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3">{b.guest_name ?? '—'}<br /><span className="text-xs text-muted">{b.guest_email ?? ''}</span></td>
                   <td className="px-4 py-3 font-mono">{b.space_code ?? '—'}</td>
                   <td className="px-4 py-3">{b.status.replace('_',' ')}</td>

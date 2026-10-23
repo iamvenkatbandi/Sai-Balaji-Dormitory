@@ -38,7 +38,6 @@ import { AdminBookingDetailPage } from './routes/admin/BookingDetailPage';
 import { AdminReceptionPage } from './routes/admin/ReceptionPage';
 import { AdminRatesPage } from './routes/admin/RatesPage';
 import { AdminSettingsPage } from './routes/admin/SettingsPage';
-import { AdminFinancePage } from './routes/admin/FinancePage';
 import { AdminReportsPage } from './routes/admin/ReportsPage';
 import { AdminCleaningPage } from './routes/admin/CleaningPage';
 import { AdminMaintenancePage } from './routes/admin/MaintenancePage';
@@ -115,7 +114,6 @@ const router = createBrowserRouter([
           { path: 'cleaning', element: <AdminCleaningPage /> },
           { path: 'maintenance', element: <AdminMaintenancePage /> },
           { path: 'washrooms', element: <AdminWashroomsPage /> },
-          { path: 'finance', element: <AdminFinancePage /> },
           { path: 'reports', element: <AdminReportsPage /> },
           { path: 'rates', element: <AdminRatesPage /> },
           { path: 'policies', element: <AdminPoliciesPage /> },

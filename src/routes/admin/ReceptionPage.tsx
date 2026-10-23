@@ -32,6 +32,7 @@ export function AdminReceptionPage() {
     try { await checkInBooking(id); window.location.reload(); }
     catch (e) { alert(e instanceof Error ? e.message : 'Failed'); }
   }
+  
   async function doCheckOut(id: string) {
     if (!confirm('Check out this guest?')) return;
     try { await checkOutBooking(id); window.location.reload(); }

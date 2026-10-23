@@ -63,47 +63,23 @@ export function AdminSettingsPage() {
   if (settings.status === 'error') return <ErrorState message={settings.error.message} />;
 
   async function saveContact(e: React.FormEvent) {
-    e.preventDefault();
-    setContactState('saving'); setContactErr(null);
+    e.preventDefault(); setContactState('saving'); setContactErr(null);
     try {
       const id = await getPropertyId();
-      const { error } = await supabase.from('property_contact').update({
-        address_line: address || null,
-        locality: locality || null,
-        region: region || null,
-        postal_code: postal || null,
-        phone: phone || null,
-        email: email || null,
-        map_url: mapUrl || null,
-      }).eq('property_id', id);
+      const { error } = await supabase.from('property_contact').update({ address_line: address || null, locality: locality || null, region: region || null, postal_code: postal || null, phone: phone || null, email: email || null, map_url: mapUrl || null }).eq('property_id', id);
       if (error) throw error;
       setContactState('saved');
-    } catch (e) {
-      setContactErr(e instanceof Error ? e.message : 'Save failed');
-      setContactState('error');
-    }
+    } catch (e) { setContactErr(e instanceof Error ? e.message : 'Save failed'); setContactState('error'); }
   }
 
   async function saveSettings(e: React.FormEvent) {
-    e.preventDefault();
-    setSettingsState('saving'); setSettingsErr(null);
+    e.preventDefault(); setSettingsState('saving'); setSettingsErr(null);
     try {
       const id = await getPropertyId();
-      const { error } = await supabase.from('property_settings').update({
-        cleaning_buffer_minutes: buffer,
-        booking_horizon_days: horizon,
-        max_stay_days: maxStay,
-        min_hourly_minutes: minHourly,
-        overstay_grace_minutes: grace,
-        deposits_enabled: deposits,
-        enquiries_enabled: enquiries,
-      }).eq('property_id', id);
+      const { error } = await supabase.from('property_settings').update({ cleaning_buffer_minutes: buffer, booking_horizon_days: horizon, max_stay_days: maxStay, min_hourly_minutes: minHourly, overstay_grace_minutes: grace, deposits_enabled: deposits, enquiries_enabled: enquiries }).eq('property_id', id);
       if (error) throw error;
       setSettingsState('saved');
-    } catch (e) {
-      setSettingsErr(e instanceof Error ? e.message : 'Save failed');
-      setSettingsState('error');
-    }
+    } catch (e) { setSettingsErr(e instanceof Error ? e.message : 'Save failed'); setSettingsState('error'); }
   }
 
   return (
@@ -113,9 +89,7 @@ export function AdminSettingsPage() {
       <div className="space-y-6">
         <SectionCard title="Property contact" subtitle="Leave fields blank to keep the “Contact details are being finalised” placeholder on the public site">
           <form onSubmit={saveContact} className="space-y-3">
-            <Field label="Address line" htmlFor="s-addr">
-              <input id="s-addr" className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} />
-            </Field>
+            <Field label="Address line" htmlFor="s-addr"><input id="s-addr" className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} /></Field>
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Locality" htmlFor="s-loc"><input id="s-loc" className={inputClass} value={locality} onChange={(e) => setLocality(e.target.value)} /></Field>
               <Field label="Region / State" htmlFor="s-reg"><input id="s-reg" className={inputClass} value={region} onChange={(e) => setRegion(e.target.value)} /></Field>

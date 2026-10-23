@@ -52,11 +52,7 @@ export function AdminRatesPage() {
       </div>
 
       {editing && (
-        <RateEditor
-          plan={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); window.location.reload(); }}
-        />
+        <RateEditor plan={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); window.location.reload(); }} />
       )}
     </>
   );
@@ -73,9 +69,7 @@ function Row({ label, value, suffix }: { label: string; value: number | null; su
   );
 }
 
-function RateEditor({ plan, onClose, onSaved }: {
-  plan: RatePlanWithVersion; onClose: () => void; onSaved: () => void;
-}) {
+function RateEditor({ plan, onClose, onSaved }: { plan: RatePlanWithVersion; onClose: () => void; onSaved: () => void }) {
   const v = plan.current_version;
   const [hourly, setHourly] = useState<number | null>(v?.hourly_rate_paise ?? null);
   const [extra, setExtra] = useState<number | null>(v?.extra_hour_rate_paise ?? null);
@@ -101,11 +95,8 @@ function RateEditor({ plan, onClose, onSaved }: {
         deposit_paise: null,
       });
       onSaved();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Save failed');
-    } finally {
-      setSaving(false);
-    }
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Save failed'); } 
+    finally { setSaving(false); }
   }
 
   return (
@@ -118,19 +109,10 @@ function RateEditor({ plan, onClose, onSaved }: {
           <MoneyField label="Hourly rate (₹)" value={hourly} onChange={setHourly} />
           <MoneyField label="Extra-hour rate (₹)" value={extra} onChange={setExtra} />
           <MoneyField label="Overnight rate (₹)" value={overnight} onChange={setOvernight} />
-          <Field label="Overnight duration (minutes)" htmlFor="overnight-min">
-            <input id="overnight-min" type="number" className={inputClass}
-              value={overnightMin ?? ''} onChange={(e) => setOvernightMin(e.target.value ? Number(e.target.value) : null)} />
-          </Field>
+          <Field label="Overnight duration (minutes)" htmlFor="overnight-min"><input id="overnight-min" type="number" className={inputClass} value={overnightMin ?? ''} onChange={(e) => setOvernightMin(e.target.value ? Number(e.target.value) : null)} /></Field>
           <MoneyField label="Extended-stay rate (₹)" value={extended} onChange={setExtended} />
-          <Field label="Extended-stay duration (minutes)" htmlFor="ext-min">
-            <input id="ext-min" type="number" className={inputClass}
-              value={extendedMin ?? ''} onChange={(e) => setExtendedMin(e.target.value ? Number(e.target.value) : null)} />
-          </Field>
-          <Field label="Minimum booking (minutes)" htmlFor="min-booking" required>
-            <input id="min-booking" type="number" className={inputClass}
-              value={minBooking} onChange={(e) => setMinBooking(Number(e.target.value))} />
-          </Field>
+          <Field label="Extended-stay duration (minutes)" htmlFor="ext-min"><input id="ext-min" type="number" className={inputClass} value={extendedMin ?? ''} onChange={(e) => setExtendedMin(e.target.value ? Number(e.target.value) : null)} /></Field>
+          <Field label="Minimum booking (minutes)" htmlFor="min-booking" required><input id="min-booking" type="number" className={inputClass} value={minBooking} onChange={(e) => setMinBooking(Number(e.target.value))} /></Field>
         </div>
 
         {err && <p role="alert" className="mt-3 text-sm text-[#B3261E]">{err}</p>}
@@ -144,14 +126,10 @@ function RateEditor({ plan, onClose, onSaved }: {
   );
 }
 
-function MoneyField({ label, value, onChange }: {
-  label: string; value: number | null; onChange: (v: number | null) => void;
-}) {
+function MoneyField({ label, value, onChange }: { label: string; value: number | null; onChange: (v: number | null) => void }) {
   return (
     <Field label={label} htmlFor={label}>
-      <input id={label} type="number" step="1" className={inputClass}
-        value={value == null ? '' : value / 100}
-        onChange={(e) => onChange(e.target.value ? Math.round(Number(e.target.value) * 100) : null)} />
+      <input id={label} type="number" step="1" className={inputClass} value={value == null ? '' : value / 100} onChange={(e) => onChange(e.target.value ? Math.round(Number(e.target.value) * 100) : null)} />
     </Field>
   );
 }
