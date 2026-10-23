@@ -54,7 +54,16 @@ export function AdminBookingDetailPage() {
         eyebrow="Booking"
         title={booking.reference}
         intro={`${booking.status.replace('_', ' ')} · ${booking.product_type.replaceAll('_', ' ')}`}
-        actions={<Link to="/admin/bookings" className="text-sm text-brand-900 hover:underline">← All bookings</Link>}
+        actions={
+          <div className="flex gap-3">
+            <Link to={`/admin/receipt/${booking.id}`} className="inline-flex items-center justify-center rounded-input border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-bg">
+              Print Receipt
+            </Link>
+            <Link to="/admin/bookings" className="inline-flex items-center justify-center rounded-input px-4 py-2 text-sm font-medium text-brand-900 hover:underline">
+              ← All bookings
+            </Link>
+          </div>
+        }
       />
 
       {actionErr && <div className="mb-4"><ErrorState message={actionErr} /></div>}

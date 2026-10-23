@@ -11,7 +11,7 @@ input, select, textarea { font-variant-numeric: tabular-nums; }
 @media print {
   @page {
     size: A4 portrait;
-    margin: 15mm;
+    margin: 10mm;
   }
   
   body {
@@ -20,18 +20,31 @@ input, select, textarea { font-variant-numeric: tabular-nums; }
     print-color-adjust: exact !important;
   }
 
-  /* Hide elements that shouldn't be printed */
+  /* Standard helper to hide UI elements */
   .print-hidden {
     display: none !important;
   }
 
-  /* Ensure rows don't break across pages */
+  /* Isolate a specific area for printing (used by the Receipt page) */
+  body.print-isolate * {
+    visibility: hidden;
+  }
+  body.print-isolate .print-area,
+  body.print-isolate .print-area * {
+    visibility: visible;
+  }
+  body.print-isolate .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Ensure tables don't break awkwardly */
   tr {
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  
-  /* Repeat table headers on every printed page */
   thead {
     display: table-header-group;
   }

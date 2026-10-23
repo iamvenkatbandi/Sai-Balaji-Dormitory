@@ -49,6 +49,8 @@ import { AdminWashroomsPage } from './routes/admin/WashroomsPage';
 import { AdminStaffPage } from './routes/admin/StaffPage';
 import { AdminPoliciesPage } from './routes/admin/PoliciesPage';
 
+import { ReceiptPage } from './routes/shared/ReceiptPage';
+
 function StaffPlaceholder() {
   return (
     <div className="mx-auto max-w-3xl py-16">
@@ -99,6 +101,7 @@ const router = createBrowserRouter([
           { path: 'support/new', element: <NewSupportPage /> },
           { path: 'support/:id', element: <SupportTicketPage /> },
           { path: 'profile', element: <ProfilePage /> },
+          { path: 'receipt/:id', element: <ReceiptPage /> },
         ],
       },
     ],
@@ -124,6 +127,7 @@ const router = createBrowserRouter([
           { path: 'policies', element: <AdminPoliciesPage /> },
           { path: 'staff', element: <AdminStaffPage /> },
           { path: 'settings', element: <AdminSettingsPage /> },
+          { path: 'receipt/:id', element: <ReceiptPage /> },
         ],
       },
     ],
