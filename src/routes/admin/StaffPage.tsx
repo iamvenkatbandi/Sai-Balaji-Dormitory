@@ -26,9 +26,14 @@ export function AdminStaffPage() {
     setLookupErr(null);
     try {
       const u = await findUserByEmail(searchEmail.trim());
-      if (!u) { setLookupErr('No registered user has that email. They must sign up at /register first.'); return; }
+      if (!u) { 
+        setLookupErr('No registered user has that email. They must sign up at /register first.'); 
+        return; 
+      }
       setTarget(u);
-    } catch (e) { setLookupErr(e instanceof Error ? e.message : 'Lookup failed'); }
+    } catch (e) { 
+      setLookupErr(e instanceof Error ? e.message : 'Lookup failed'); 
+    }
   }
 
   async function toggleRole(userId: string, roleCode: string, has: boolean) {
@@ -36,7 +41,9 @@ export function AdminStaffPage() {
       if (has) await revokeRole(userId, roleCode);
       else await assignRole(userId, roleCode);
       window.location.reload();
-    } catch (e) { alert(e instanceof Error ? e.message : 'Failed'); }
+    } catch (e) { 
+      alert(e instanceof Error ? e.message : 'Failed'); 
+    }
   }
 
   return (
@@ -46,10 +53,18 @@ export function AdminStaffPage() {
       <SectionCard title="Add a staff member" subtitle="The user must have registered at /register first">
         <form onSubmit={lookup} className="flex flex-wrap items-end gap-3">
           <Field label="Email" htmlFor="staff-email" required>
-            <input id="staff-email" type="email" className={inputClass} value={searchEmail} onChange={(e) => setSearchEmail(e.target.value)} required />
+            <input 
+              id="staff-email" 
+              type="email" 
+              className={inputClass} 
+              value={searchEmail} 
+              onChange={(e) => setSearchEmail(e.target.value)} 
+              required 
+            />
           </Field>
           <Button type="submit" variant="secondary">Find user</Button>
         </form>
+        
         {lookupErr && <p role="alert" className="mt-3 text-sm text-[#B3261E]">{lookupErr}</p>}
 
         {target && (
@@ -57,7 +72,11 @@ export function AdminStaffPage() {
             <p className="text-sm text-ink">{target.full_name ?? '—'} · {target.email}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {roles.data.map((r) => (
-                <button key={r.code} onClick={() => toggleRole(target.user_id, r.code, false)} className="rounded-full border border-brand-900 bg-brand-900 px-3 py-1 text-xs text-white hover:bg-brand-700">
+                <button 
+                  key={r.code} 
+                  onClick={() => toggleRole(target.user_id, r.code, false)} 
+                  className="rounded-full border border-brand-900 bg-brand-900 px-3 py-1 text-xs text-white hover:bg-brand-700"
+                >
                   Grant {r.name}
                 </button>
               ))}
@@ -82,9 +101,15 @@ export function AdminStaffPage() {
                   <div className="flex flex-wrap gap-1">
                     {s.roles.length === 0 && <span className="text-xs text-muted">No roles</span>}
                     {s.roles.map((r) => (
-                      <span key={r} className="rounded-full border border-line bg-bg px-2 py-0.5 text-xs text-ink">
+                      <span key={r} className="flex items-center gap-1 rounded-full border border-line bg-bg px-2 py-0.5 text-xs text-ink">
                         {r.replaceAll('_', ' ')}
-                        <button onClick={() => toggleRole(s.user_id, r, true)} className="ml-2 text-[#B3261E] hover:underline">×</button>
+                        <button 
+                          onClick={() => toggleRole(s.user_id, r, true)} 
+                          className="text-[#B3261E] hover:underline"
+                          aria-label={`Revoke ${r}`}
+                        >
+                          ×
+                        </button>
                       </span>
                     ))}
                   </div>
