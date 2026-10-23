@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { QRCodeCanvas } from 'qrcode.react';
 import { useAsync } from '../../lib/useAsync';
 import { getReceiptData } from '../../lib/queries';
 import { Spinner } from '../../components/Spinner';
@@ -27,8 +26,11 @@ export function ReceiptPage() {
   const isFullyPaid = totalPaid >= booking.total_paise;
   const balanceDue = booking.total_paise - totalPaid;
 
-  // The URL encoded in the QR code
+  // 1. Generate the verification URL
   const verifyUrl = `${window.location.origin}/verify-receipt/${booking.id}`;
+  
+  // 2. Generate the external QR Code Image URL
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(verifyUrl)}`;
 
   return (
     <div className="min-h-screen bg-bg py-12 px-4 print:bg-white print:py-0 print:px-0">
@@ -137,11 +139,12 @@ export function ReceiptPage() {
             
             {/* QR Code Block */}
             <div className="text-center print:block bg-white p-2 rounded border border-gray-200">
-              <QRCodeCanvas 
-                value={verifyUrl} 
-                size={90} 
-                level="M" 
-                includeMargin={true}
+              <img 
+                src={qrCodeUrl} 
+                alt="Verification QR Code" 
+                width={90} 
+                height={90} 
+                className="mx-auto"
               />
               <p className="mt-1 text-[10px] font-medium text-muted uppercase tracking-wider">Scan to verify</p>
             </div>
