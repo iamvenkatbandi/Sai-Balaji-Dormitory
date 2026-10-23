@@ -44,7 +44,7 @@ export function AdminWashroomsPage() {
 
   const washrooms = useAsync(loadWashrooms, [refreshKey]);
 
-  // Realtime listener
+  // Realtime listener for instant updates when housekeeping changes status
   useEffect(() => {
     const channel = supabase.channel('washroom-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'washroom_areas' }, () => setRefreshKey(k => k + 1))
@@ -73,7 +73,7 @@ export function AdminWashroomsPage() {
       <PageHeader
         eyebrow="Facilities"
         title="Washroom Registry"
-        intro="Live tracking of washroom status and cleanliness."
+        intro="Live map view of washroom blocks. Updates automatically."
         actions={canManage && <Button onClick={() => setShowCreate(true)}>Add Washroom</Button>}
       />
 
@@ -103,49 +103,60 @@ export function AdminWashroomsPage() {
               <span>{style.label}</span>
             </span>
           ))}
+          <span className="ml-auto">
+            Showing <span className="tabular-nums text-ink">{filtered.length}</span> blocks
+          </span>
         </div>
       </div>
 
       {filtered.length === 0 ? (
         <EmptyState 
           title={`No washrooms in ${section === 'AC' ? 'AC' : 'Non-AC'} Hall`} 
-          body="Add a washroom to start tracking its status." 
+          body="Add a washroom block to start tracking its status." 
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {filtered.map((w) => {
             const s = STATUS_STYLE[w.status] || STATUS_STYLE.operational;
             return (
               <button
                 key={w.id}
                 onClick={() => setSelected(w.id)}
-                className="group relative flex flex-col rounded-card border-2 bg-surface p-4 text-left transition hover:scale-[1.02] hover:shadow-md focus:outline-none"
-                style={{ borderColor: s.border, background: s.fill }}
+                className="group relative flex flex-col rounded-card border-2 p-3 text-left transition-transform hover:scale-[1.02] hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-900"
+                style={{ background: s.fill, borderColor: s.border }}
               >
-                <div className="w-full flex justify-between items-start">
-                  <span className="font-semibold text-ink text-sm">{w.name}</span>
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-white/50" style={{ color: s.text }}>
+                {/* Header: Name and Status */}
+                <div className="w-full flex justify-between items-start mb-3">
+                  <span className="font-semibold text-sm leading-tight" style={{ color: s.text }}>
+                    {w.name}
+                  </span>
+                  <span 
+                    className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-white/60" 
+                    style={{ color: s.text }}
+                  >
                     {s.label}
                   </span>
                 </div>
                 
-                <div className="mt-4 grid grid-cols-3 gap-2 w-full text-center">
+                {/* Fixtures (Toilets, Basins, Showers) */}
+                <div className="mt-auto grid grid-cols-3 gap-1 w-full text-center">
                   <div className="rounded bg-white/60 p-1">
-                    <p className="text-[10px] uppercase text-muted">Toilets</p>
-                    <p className="text-sm font-bold text-ink">{w.toilet_count ?? '—'}</p>
+                    <p className="text-[9px] uppercase tracking-wide text-muted">Toilets</p>
+                    <p className="text-sm font-bold" style={{ color: s.text }}>{w.toilet_count ?? '—'}</p>
                   </div>
                   <div className="rounded bg-white/60 p-1">
-                    <p className="text-[10px] uppercase text-muted">Basins</p>
-                    <p className="text-sm font-bold text-ink">{w.basin_count ?? '—'}</p>
+                    <p className="text-[9px] uppercase tracking-wide text-muted">Basins</p>
+                    <p className="text-sm font-bold" style={{ color: s.text }}>{w.basin_count ?? '—'}</p>
                   </div>
                   <div className="rounded bg-white/60 p-1">
-                    <p className="text-[10px] uppercase text-muted">Showers</p>
-                    <p className="text-sm font-bold text-ink">{w.shower_count ?? '—'}</p>
+                    <p className="text-[9px] uppercase tracking-wide text-muted">Showers</p>
+                    <p className="text-sm font-bold" style={{ color: s.text }}>{w.shower_count ?? '—'}</p>
                   </div>
                 </div>
                 
-                <p className="mt-3 text-[10px] text-muted text-center w-full truncate">
-                  Last cleaned: {w.last_cleaned_at ? formatDateTime(w.last_cleaned_at) : 'Never'}
+                {/* Footer: Last Cleaned */}
+                <p className="mt-2 text-[10px] text-center w-full truncate opacity-80" style={{ color: s.text }}>
+                  Last cleaned: {w.last_cleaned_at ? formatDateTime(w.last_cleaned_at).split(',')[0] : 'Never'}
                 </p>
               </button>
             );
@@ -240,7 +251,9 @@ function WashroomDrawer({ washroomId, canManage, onClose, onChanged }: {
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-card bg-surface shadow-overlay" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
           <h2 className="text-base font-semibold text-ink">Washroom Operations</h2>
-          <button onClick={onClose} className="rounded-input p-1.5 text-muted hover:bg-bg">✕</button>
+          <button onClick={onClose} className="rounded-input p-1.5 text-muted hover:bg-bg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+          </button>
         </div>
 
         <div className="p-5 space-y-6">
@@ -388,7 +401,7 @@ function CreateModal({ sectionCode, onClose, onSuccess }: { sectionCode: 'AC' | 
         
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="secondary" type="button" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button type="submit" loading={saving}>Create</Button>
+          <Button type="submit" loading={saving}>Create Washroom</Button>
         </div>
       </form>
     </div>
