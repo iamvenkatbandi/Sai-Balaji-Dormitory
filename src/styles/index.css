@@ -1,11 +1,9 @@
+/* existing code... */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-}
+html { font-family: 'Inter', system-ui, sans-serif; font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11'; }
 body { @apply bg-bg text-ink antialiased; }
 input, select, textarea { font-variant-numeric: tabular-nums; }
 
@@ -18,8 +16,8 @@ input, select, textarea { font-variant-numeric: tabular-nums; }
   
   body {
     background: white !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   /* Hide elements that shouldn't be printed */
@@ -31,5 +29,11 @@ input, select, textarea { font-variant-numeric: tabular-nums; }
   .print-break-avoid {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+  
+  /* Force charts to take full width */
+  .recharts-responsive-container {
+    width: 100% !important;
+    height: 300px !important;
   }
 }
