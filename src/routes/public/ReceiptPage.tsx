@@ -22,9 +22,13 @@ export function ReceiptPage() {
 
   const { booking, guest_name, payments, property } = data.data;
 
+  // Use the final total if it exists (set at checkout), otherwise the original booking total
+  const finalTotal = (booking as any).final_total_paise ?? booking.total_paise;
+  const extraCharges = (booking as any).extra_charges_paise ?? 0;
+
   const totalPaid = payments.reduce((sum, p) => sum + p.amount_paise, 0);
-  const isFullyPaid = totalPaid >= booking.total_paise;
-  const balanceDue = booking.total_paise - totalPaid;
+  const balanceDue = finalTotal - totalPaid;
+  const isFullyPaid = balanceDue <= 0;
 
   // 1. Generate the verification URL
   const verifyUrl = `${window.location.origin}/verify-receipt/${booking.id}`;
@@ -101,6 +105,16 @@ export function ReceiptPage() {
                   {formatCurrencyINR(booking.total_paise)}
                 </td>
               </tr>
+              {extraCharges > 0 && (
+                <tr className="border-b border-line">
+                  <td className="py-4 px-4">
+                    <p className="font-medium text-ink">Extra Hours / Overstay / Incidentals</p>
+                  </td>
+                  <td className="py-4 px-4 text-right tabular-nums">
+                    {formatCurrencyINR(extraCharges)}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -118,7 +132,7 @@ export function ReceiptPage() {
             </div>
             <div className="flex justify-between border-t border-line pt-2 font-semibold text-ink">
               <span>Total</span>
-              <span className="tabular-nums">{formatCurrencyINR(booking.total_paise)}</span>
+              <span className="tabular-nums">{formatCurrencyINR(finalTotal)}</span>
             </div>
             <div className="flex justify-between text-brand-900 font-medium pt-2">
               <span>Amount Paid</span>

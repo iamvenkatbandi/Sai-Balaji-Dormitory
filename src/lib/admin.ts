@@ -447,3 +447,42 @@ export async function getUnassignedBookings(sectionCode: 'AC' | 'NON_AC'): Promi
   if (error) throw await rpcError(error);
   return (data ?? []) as UnassignedBooking[];
 }
+
+export interface CheckoutCalculation {
+  booking_id: string;
+  original_total_paise: number;
+  recalculated_total_paise: number;
+  overstay_charge_paise: number;
+  manual_charges: Array<{ description: string; amount: number }>;
+  manual_total_paise: number;
+  grand_total_paise: number;
+  balance_due_paise: number;
+}
+
+export async function calculateCheckout(bookingId: string, actualCheckoutTime: string): Promise<CheckoutCalculation> {
+  const { data, error } = await supabase.rpc('admin_calculate_checkout', {
+    p_booking_id: bookingId,
+    p_actual_checkout_time: actualCheckoutTime,
+  });
+  if (error) throw await rpcError(error);
+  return data as CheckoutCalculation;
+}
+
+export async function addBookingCharge(bookingId: string, description: string, amountPaise: number): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  const { error } = await supabase.from('booking_charges').insert({
+    booking_id: bookingId,
+    description,
+    amount_paise: amountPaise,
+    created_by: user?.id,
+  });
+  if (error) throw await rpcError(error);
+}
+
+export async function processCheckout(bookingId: string, actualCheckoutTime: string): Promise<void> {
+  const { error } = await supabase.rpc('admin_check_out', {
+    p_booking_id: bookingId,
+    p_actual_checkout_time: actualCheckoutTime,
+  });
+  if (error) throw await rpcError(error);
+}

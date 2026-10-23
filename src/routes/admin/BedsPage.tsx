@@ -4,7 +4,7 @@ import { useAsync } from '../../lib/useAsync';
 import {
   getBedsStatus, getBedDetail, blockBed, releaseBlock,
   proposeWomenReserved, applyWomenReserved, assignBedManual,
-  transferBooking, toggleBedActive, checkInBooking, checkOutBooking,
+  transferBooking, toggleBedActive, checkInBooking,
   getUnassignedBookings
 } from '../../lib/admin';
 import { supabase } from '../../lib/supabase';
@@ -16,6 +16,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Button } from '../../components/Button';
 import { Field, inputClass } from '../../components/Field';
 import { formatDateTime } from '../../lib/format';
+import { CheckoutBillingModal } from '../../components/CheckoutBillingModal';
 import type { BedDetail, BedRow, BedStatus } from '../../lib/database.types';
 
 const STATUS_STYLE: Record<BedStatus, { fill: string; border: string; text: string; pillow: string; label: string }> = {
@@ -36,6 +37,9 @@ const FILTER_OPTIONS: Array<{ value: BedStatus | 'all'; label: string }> = [
   { value: 'maintenance', label: 'Maintenance' },
   { value: 'inactive', label: 'Inactive' },
 ];
+
+const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
+const MINUTES = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
 
 export function AdminBedsPage() {
   const { permissions } = useOutletContext<AdminOutletContext>();
@@ -250,6 +254,7 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
   const [transferRef, setTransferRef] = useState('');
   const [transferring, setTransferring] = useState(false);
   const [working, setWorking] = useState(false);
+  const [showBilling, setShowBilling] = useState(false);
 
   function buildIso(dateStr: string, hourStr: string, minuteStr: string, period: 'AM' | 'PM') {
     if (!dateStr) return '';
@@ -308,15 +313,6 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
     finally { setWorking(false); }
   }
 
-  async function handleCheckOut() {
-    if (!detail.data?.current_booking) return;
-    if (!confirm('Check out this guest?')) return;
-    setWorking(true); setErr(null);
-    try { await checkOutBooking(detail.data.current_booking.id); onChanged(); }
-    catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Check-out failed'); }
-    finally { setWorking(false); }
-  }
-
   async function handleToggleActive() {
     if (!detail.data) return;
     const isActive = detail.data.space.is_active;
@@ -328,134 +324,144 @@ function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClo
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-card bg-surface shadow-overlay" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
-          <h2 className="text-base font-semibold text-ink">Bed Operations</h2>
-          <button onClick={onClose} className="rounded-input p-1.5 text-muted hover:bg-bg">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-          </button>
-        </div>
+    <>
+      <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+        <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-card bg-surface shadow-overlay" onClick={(e) => e.stopPropagation()}>
+          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
+            <h2 className="text-base font-semibold text-ink">Bed Operations</h2>
+            <button onClick={onClose} className="rounded-input p-1.5 text-muted hover:bg-bg">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+            </button>
+          </div>
 
-        <div className="px-5 py-4 space-y-6">
-          {detail.status === 'loading' && <Spinner />}
-          {detail.status === 'error' && <ErrorState message={detail.error.message} />}
-          
-          {detail.status === 'success' && (
-            <>
-              <BedDetailBody detail={detail.data} />
+          <div className="px-5 py-4 space-y-6">
+            {detail.status === 'loading' && <Spinner />}
+            {detail.status === 'error' && <ErrorState message={detail.error.message} />}
+            
+            {detail.status === 'success' && (
+              <>
+                <BedDetailBody detail={detail.data} />
 
-              {/* CURRENT BOOKING ACTIONS */}
-              {detail.data.current_booking && (
-                <div className="rounded-input border border-[#E6F4ED] bg-[#E6F4ED] p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-bold text-[#2E7D5B]">Current Booking</h3>
-                    <span className="text-xs font-semibold uppercase px-2 py-0.5 rounded bg-white text-[#2E7D5B]">
-                      {detail.data.current_booking.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                  
-                  <div className="text-sm text-[#2E7D5B] mb-4 space-y-1">
-                    <p><strong>Ref:</strong> {detail.data.current_booking.reference}</p>
-                    <p><strong>Guest:</strong> {detail.data.current_booking.guest_name || '—'}</p>
-                    <p><strong>Dates:</strong> {formatDateTime(detail.data.current_booking.starts_at).split(',')[0]} to {formatDateTime(detail.data.current_booking.ends_at).split(',')[0]}</p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {detail.data.current_booking.status === 'confirmed' && (
-                      <Button onClick={handleCheckIn} loading={working} className="bg-[#2E7D5B] text-white hover:bg-[#236346] w-full sm:w-auto">
-                        Check In Guest
-                      </Button>
-                    )}
-                    {detail.data.current_booking.status === 'checked_in' && (
-                      <Button onClick={handleCheckOut} loading={working} variant="danger" className="w-full sm:w-auto">
-                        Check Out Guest
-                      </Button>
-                    )}
-                  </div>
-                  
-                  <form onSubmit={handleTransfer} className="mt-4 flex gap-2">
-                    <input className={`${inputClass} flex-1 bg-white`} placeholder="Transfer to Bed Code (e.g. AC-015)" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} required />
-                    <Button type="submit" loading={transferring} variant="secondary">Transfer</Button>
-                  </form>
-                </div>
-              )}
-
-              {/* MANUAL ASSIGNMENT (DROPDOWN) */}
-              {canAssign && !detail.data.current_booking && (
-                <div className="border-t border-line pt-4">
-                  <h3 className="text-sm font-semibold text-ink">Assign Booking</h3>
-                  {unassigned.status === 'loading' ? (
-                    <p className="text-sm text-muted mt-2">Loading unassigned bookings...</p>
-                  ) : unassigned.status === 'error' ? (
-                    <p className="text-sm text-[#B3261E] mt-2">Failed to load bookings.</p>
-                  ) : unassigned.data.length === 0 ? (
-                    <p className="text-sm text-muted mt-2">No unassigned bookings available for this section.</p>
-                  ) : (
-                    <form onSubmit={handleManualAssign} className="mt-2 flex gap-2">
-                      <select 
-                        className={`${inputClass} flex-1`} 
-                        value={assignId} 
-                        onChange={(e) => setAssignId(e.target.value)}
-                        required
-                      >
-                        <option value="" disabled>Select a booking to assign...</option>
-                        {unassigned.data.map((b) => (
-                          <option key={b.booking_id} value={b.booking_id}>
-                            {b.reference} — {b.guest_name} ({formatDateTime(b.starts_at).split(',')[0]})
-                          </option>
-                        ))}
-                      </select>
-                      <Button type="submit" loading={assigning} disabled={!assignId}>Assign</Button>
-                    </form>
-                  )}
-                </div>
-              )}
-
-              {/* DISABLE BED */}
-              {canManage && (
-                <div className="border-t border-line pt-4 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-ink">Bed Status</h3>
-                    <p className="text-xs text-muted">Take this bed offline permanently.</p>
-                  </div>
-                  <Button variant={detail.data.space.is_active ? 'danger' : 'primary'} onClick={handleToggleActive} loading={working}>
-                    {detail.data.space.is_active ? 'Disable Bed' : 'Enable Bed'}
-                  </Button>
-                </div>
-              )}
-
-              {/* MAINTENANCE BLOCK */}
-              {canBlock && (
-                <div className="border-t border-line pt-4">
-                  <h3 className="text-sm font-semibold text-ink mb-2">Block for Maintenance</h3>
-                  <form onSubmit={doBlock} className="space-y-3">
-                    <div className="flex gap-2">
-                      <input type="date" className={`${inputClass} flex-1`} value={fromDate} onChange={(e) => setFromDate(e.target.value)} required />
-                      <input type="date" className={`${inputClass} flex-1`} value={toDate} onChange={(e) => setToDate(e.target.value)} required />
+                {/* CURRENT BOOKING ACTIONS */}
+                {detail.data.current_booking && (
+                  <div className="rounded-input border border-[#E6F4ED] bg-[#E6F4ED] p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-bold text-[#2E7D5B]">Current Booking</h3>
+                      <span className="text-xs font-semibold uppercase px-2 py-0.5 rounded bg-white text-[#2E7D5B]">
+                        {detail.data.current_booking.status.replace('_', ' ')}
+                      </span>
                     </div>
-                    <input className={inputClass} placeholder="Reason (e.g. Broken fan)" value={reason} onChange={(e) => setReason(e.target.value)} />
-                    <Button type="submit" loading={blocking} variant="secondary">Create Block</Button>
-                  </form>
-                  {detail.data.maintenance_history.length > 0 && (
-                    <ul className="mt-3 space-y-1 text-sm">
-                      {detail.data.maintenance_history.map((b) => (
-                        <li key={b.id} className="flex justify-between border border-line p-2 rounded bg-bg">
-                          <span>{formatDateTime(b.blocked_from).split(',')[0]} to {formatDateTime(b.blocked_to).split(',')[0]}</span>
-                          <button onClick={() => doRelease(b.id)} className="text-xs text-brand-900 hover:underline">Release</button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+                    
+                    <div className="text-sm text-[#2E7D5B] mb-4 space-y-1">
+                      <p><strong>Ref:</strong> {detail.data.current_booking.reference}</p>
+                      <p><strong>Guest:</strong> {detail.data.current_booking.guest_name || '—'}</p>
+                      <p><strong>Dates:</strong> {formatDateTime(detail.data.current_booking.starts_at).split(',')[0]} to {formatDateTime(detail.data.current_booking.ends_at).split(',')[0]}</p>
+                    </div>
 
-              {err && <p role="alert" className="text-sm text-[#B3261E]">{err}</p>}
-            </>
-          )}
+                    <div className="flex flex-wrap gap-2">
+                      {detail.data.current_booking.status === 'confirmed' && (
+                        <Button onClick={handleCheckIn} loading={working} className="bg-[#2E7D5B] text-white hover:bg-[#236346] w-full sm:w-auto">
+                          Check In Guest
+                        </Button>
+                      )}
+                      {detail.data.current_booking.status === 'checked_in' && (
+                        <Button onClick={() => setShowBilling(true)} loading={working} variant="danger" className="w-full sm:w-auto">
+                          Check Out Guest
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <form onSubmit={handleTransfer} className="mt-4 flex gap-2">
+                      <input className={`${inputClass} flex-1 bg-white`} placeholder="Transfer to Bed Code (e.g. AC-015)" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} required />
+                      <Button type="submit" loading={transferring} variant="secondary">Transfer</Button>
+                    </form>
+                  </div>
+                )}
+
+                {/* MANUAL ASSIGNMENT (DROPDOWN) */}
+                {canAssign && !detail.data.current_booking && (
+                  <div className="border-t border-line pt-4">
+                    <h3 className="text-sm font-semibold text-ink">Assign Booking</h3>
+                    {unassigned.status === 'loading' ? (
+                      <p className="text-sm text-muted mt-2">Loading unassigned bookings...</p>
+                    ) : unassigned.status === 'error' ? (
+                      <p className="text-sm text-[#B3261E] mt-2">Failed to load bookings.</p>
+                    ) : unassigned.data.length === 0 ? (
+                      <p className="text-sm text-muted mt-2">No unassigned bookings available for this section.</p>
+                    ) : (
+                      <form onSubmit={handleManualAssign} className="mt-2 flex gap-2">
+                        <select 
+                          className={`${inputClass} flex-1`} 
+                          value={assignId} 
+                          onChange={(e) => setAssignId(e.target.value)}
+                          required
+                        >
+                          <option value="" disabled>Select a booking to assign...</option>
+                          {unassigned.data.map((b) => (
+                            <option key={b.booking_id} value={b.booking_id}>
+                              {b.reference} — {b.guest_name} ({formatDateTime(b.starts_at).split(',')[0]})
+                            </option>
+                          ))}
+                        </select>
+                        <Button type="submit" loading={assigning} disabled={!assignId}>Assign</Button>
+                      </form>
+                    )}
+                  </div>
+                )}
+
+                {/* DISABLE BED */}
+                {canManage && (
+                  <div className="border-t border-line pt-4 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-ink">Bed Status</h3>
+                      <p className="text-xs text-muted">Take this bed offline permanently.</p>
+                    </div>
+                    <Button variant={detail.data.space.is_active ? 'danger' : 'primary'} onClick={handleToggleActive} loading={working}>
+                      {detail.data.space.is_active ? 'Disable Bed' : 'Enable Bed'}
+                    </Button>
+                  </div>
+                )}
+
+                {/* MAINTENANCE BLOCK */}
+                {canBlock && (
+                  <div className="border-t border-line pt-4">
+                    <h3 className="text-sm font-semibold text-ink mb-2">Block for Maintenance</h3>
+                    <form onSubmit={doBlock} className="space-y-3">
+                      <div className="flex gap-2">
+                        <input type="date" className={`${inputClass} flex-1`} value={fromDate} onChange={(e) => setFromDate(e.target.value)} required />
+                        <input type="date" className={`${inputClass} flex-1`} value={toDate} onChange={(e) => setToDate(e.target.value)} required />
+                      </div>
+                      <input className={inputClass} placeholder="Reason (e.g. Broken fan)" value={reason} onChange={(e) => setReason(e.target.value)} />
+                      <Button type="submit" loading={blocking} variant="secondary">Create Block</Button>
+                    </form>
+                    {detail.data.maintenance_history.length > 0 && (
+                      <ul className="mt-3 space-y-1 text-sm">
+                        {detail.data.maintenance_history.map((b) => (
+                          <li key={b.id} className="flex justify-between border border-line p-2 rounded bg-bg">
+                            <span>{formatDateTime(b.blocked_from).split(',')[0]} to {formatDateTime(b.blocked_to).split(',')[0]}</span>
+                            <button onClick={() => doRelease(b.id)} className="text-xs text-brand-900 hover:underline">Release</button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {err && <p role="alert" className="text-sm text-[#B3261E]">{err}</p>}
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {showBilling && detail.data?.current_booking && (
+        <CheckoutBillingModal
+          bookingId={detail.data.current_booking.id}
+          onClose={() => setShowBilling(false)}
+          onSuccess={() => { setShowBilling(false); onChanged(); }}
+        />
+      )}
+    </>
   );
 }
 
