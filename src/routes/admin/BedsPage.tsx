@@ -4,7 +4,8 @@ import { useAsync } from '../../lib/useAsync';
 import {
   getBedsStatus, getBedDetail, blockBed, releaseBlock,
   proposeWomenReserved, applyWomenReserved, assignBedManual,
-  transferBooking, toggleBedActive, checkInBooking, checkOutBooking
+  transferBooking, toggleBedActive, checkInBooking, checkOutBooking,
+  getUnassignedBookings // <-- New Import
 } from '../../lib/admin';
 import { supabase } from '../../lib/supabase';
 import type { AdminOutletContext } from '../../components/Guards';
@@ -35,9 +36,6 @@ const FILTER_OPTIONS: Array<{ value: BedStatus | 'all'; label: string }> = [
   { value: 'maintenance', label: 'Maintenance' },
   { value: 'inactive', label: 'Inactive' },
 ];
-
-const HOURS = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0'));
-const MINUTES = Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0'));
 
 export function AdminBedsPage() {
   const { permissions } = useOutletContext<AdminOutletContext>();
@@ -177,6 +175,7 @@ export function AdminBedsPage() {
       {selected && (
         <BedDrawer
           spaceId={selected}
+          sectionCode={section} // Pass section to fetch correct bookings
           canBlock={canBlock}
           canAssign={canAssign}
           canManage={canManage}
@@ -228,10 +227,11 @@ function CompactBunkCell({ row, letter, onClick }: { row: BedRow; letter: 'U' | 
 }
 
 // ─── THE BED DRAWER (Operations Hub) ───────────────────────────────
-function BedDrawer({ spaceId, canBlock, canAssign, canManage, onClose, onChanged }: {
-  spaceId: string; canBlock: boolean; canAssign: boolean; canManage: boolean; onClose: () => void; onChanged: () => void;
+function BedDrawer({ spaceId, sectionCode, canBlock, canAssign, canManage, onClose, onChanged }: {
+  spaceId: string; sectionCode: 'AC' | 'NON_AC'; canBlock: boolean; canAssign: boolean; canManage: boolean; onClose: () => void; onChanged: () => void;
 }) {
   const detail = useAsync(() => getBedDetail(spaceId), [spaceId, onChanged]);
+  const unassigned = useAsync(() => getUnassignedBookings(sectionCode), [sectionCode, onChanged]);
 
   const [fromDate, setFromDate] = useState('');
   const [fromHour, setFromHour] = useState('10');
@@ -245,7 +245,7 @@ function BedDrawer({ spaceId, canBlock, canAssign, canManage, onClose, onChanged
   
   const [blocking, setBlocking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [assignRef, setAssignRef] = useState('');
+  const [assignId, setAssignId] = useState('');
   const [assigning, setAssigning] = useState(false);
   const [transferRef, setTransferRef] = useState('');
   const [transferring, setTransferring] = useState(false);
@@ -280,12 +280,11 @@ function BedDrawer({ spaceId, canBlock, canAssign, canManage, onClose, onChanged
 
   async function handleManualAssign(e: React.FormEvent) {
     e.preventDefault();
+    if (!assignId) return;
     setAssigning(true); setErr(null);
     try {
-      const { data: booking } = await supabase.from('bookings').select('id').eq('reference', assignRef.trim().toUpperCase()).maybeSingle();
-      if (!booking) throw new Error('Booking reference not found');
-      await assignBedManual(booking.id, spaceId);
-      setAssignRef(''); onChanged();
+      await assignBedManual(assignId, spaceId);
+      setAssignId(''); onChanged();
     } catch (e2) { setErr(e2 instanceof Error ? e2.message : 'Assignment failed'); }
     finally { setAssigning(false); }
   }
@@ -346,15 +345,16 @@ function BedDrawer({ spaceId, canBlock, canAssign, canManage, onClose, onChanged
             <>
               <BedDetailBody detail={detail.data} />
 
+              {/* CURRENT BOOKING ACTIONS */}
               {detail.data.current_booking && (
                 <div className="rounded-input border border-brand-100 bg-brand-100 p-4">
                   <h3 className="text-sm font-semibold text-brand-900 mb-2">Current Booking Actions</h3>
                   <div className="flex flex-wrap gap-2 mb-4">
                     {detail.data.current_booking.status === 'confirmed' && (
-                      <Button onClick={handleCheckIn} loading={working} className="bg-brand-900 text-white">Check In Guest</Button>
+                      <Button onClick={handleCheckIn} loading={working} className="bg-brand-900 text-white w-full sm:w-auto">Check In Guest</Button>
                     )}
                     {detail.data.current_booking.status === 'checked_in' && (
-                      <Button onClick={handleCheckOut} loading={working} variant="secondary">Check Out Guest</Button>
+                      <Button onClick={handleCheckOut} loading={working} variant="secondary" className="w-full sm:w-auto">Check Out Guest</Button>
                     )}
                   </div>
                   
@@ -365,16 +365,38 @@ function BedDrawer({ spaceId, canBlock, canAssign, canManage, onClose, onChanged
                 </div>
               )}
 
+              {/* MANUAL ASSIGNMENT (DROPDOWN) */}
               {canAssign && !detail.data.current_booking && (
                 <div className="border-t border-line pt-4">
                   <h3 className="text-sm font-semibold text-ink">Assign Booking</h3>
-                  <form onSubmit={handleManualAssign} className="mt-2 flex gap-2">
-                    <input className={`${inputClass} flex-1`} placeholder="e.g. SB-20231025-A1B2C3" value={assignRef} onChange={(e) => setAssignRef(e.target.value)} required />
-                    <Button type="submit" loading={assigning}>Assign</Button>
-                  </form>
+                  {unassigned.status === 'loading' ? (
+                    <p className="text-sm text-muted mt-2">Loading unassigned bookings...</p>
+                  ) : unassigned.status === 'error' ? (
+                    <p className="text-sm text-[#B3261E] mt-2">Failed to load bookings.</p>
+                  ) : unassigned.data.length === 0 ? (
+                    <p className="text-sm text-muted mt-2">No unassigned bookings available for this section.</p>
+                  ) : (
+                    <form onSubmit={handleManualAssign} className="mt-2 flex gap-2">
+                      <select 
+                        className={`${inputClass} flex-1`} 
+                        value={assignId} 
+                        onChange={(e) => setAssignId(e.target.value)}
+                        required
+                      >
+                        <option value="" disabled>Select a booking to assign...</option>
+                        {unassigned.data.map((b) => (
+                          <option key={b.booking_id} value={b.booking_id}>
+                            {b.reference} — {b.guest_name} ({formatDateTime(b.starts_at).split(',')[0]})
+                          </option>
+                        ))}
+                      </select>
+                      <Button type="submit" loading={assigning} disabled={!assignId}>Assign</Button>
+                    </form>
+                  )}
                 </div>
               )}
 
+              {/* DISABLE BED */}
               {canManage && (
                 <div className="border-t border-line pt-4 flex items-center justify-between">
                   <div>
@@ -387,6 +409,7 @@ function BedDrawer({ spaceId, canBlock, canAssign, canManage, onClose, onChanged
                 </div>
               )}
 
+              {/* MAINTENANCE BLOCK */}
               {canBlock && (
                 <div className="border-t border-line pt-4">
                   <h3 className="text-sm font-semibold text-ink mb-2">Block for Maintenance</h3>

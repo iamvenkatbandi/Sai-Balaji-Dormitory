@@ -432,3 +432,18 @@ export async function getDetailedTransactions(fromIso: string, toIso: string): P
   if (error) throw await rpcError(error);
   return (data ?? []) as TransactionLedgerRow[];
 }
+
+export interface UnassignedBooking {
+  booking_id: string;
+  reference: string;
+  guest_name: string;
+  starts_at: string;
+}
+
+export async function getUnassignedBookings(sectionCode: 'AC' | 'NON_AC'): Promise<UnassignedBooking[]> {
+  const { data, error } = await supabase.rpc('admin_unassigned_bookings', {
+    p_section_code: sectionCode,
+  });
+  if (error) throw await rpcError(error);
+  return (data ?? []) as UnassignedBooking[];
+}
