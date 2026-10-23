@@ -1,19 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { useAsync } from '../../lib/useAsync';
 import {
   getBedsStatus, getBedDetail, blockBed, releaseBlock,
-  proposeWomenReserved, applyWomenReserved, revokeWomenReserved,
+  proposeWomenReserved, applyWomenReserved, assignBedManual
 } from '../../lib/admin';
+import { supabase } from '../../lib/supabase';
 import type { AdminOutletContext } from '../../components/Guards';
 import { PageHeader } from '../../components/PageHeader';
 import { Spinner } from '../../components/Spinner';
 import { ErrorState } from '../../components/ErrorState';
 import { EmptyState } from '../../components/EmptyState';
 import { Button } from '../../components/Button';
-import { inputClass } from '../../components/Field';
+import { Field, inputClass } from '../../components/Field';
 import { formatDateTime } from '../../lib/format';
-import type { BedDetail, BedRow, BedStatus, ProposedSpace } from '../../lib/database.types';
+import type { BedDetail, BedRow, BedStatus } from '../../lib/database.types';
 
 const STATUS_STYLE: Record<BedStatus, { fill: string; border: string; text: string; pillow: string; label: string }> = {
   available:   { fill: '#E6F4ED', border: '#2E7D5B', text: '#2E7D5B', pillow: '#C8E6D5', label: 'Available' },
@@ -43,6 +44,7 @@ const NA_BUNK_TARGET = 30;
 export function AdminBedsPage() {
   const { permissions } = useOutletContext<AdminOutletContext>();
   const canBlock = permissions.includes('beds.block');
+  const canAssign = permissions.includes('beds.assign');
   const canManageWomen = permissions.includes('inventory.manage');
 
   const [section, setSection] = useState<'AC' | 'NON_AC'>('AC');
@@ -50,8 +52,26 @@ export function AdminBedsPage() {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [showProposal, setShowProposal] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0); // Used to trigger realtime refetch
 
-  const allBeds = useAsync(() => getBedsStatus({}), []);
+  // 1. Setup Realtime Subscription
+  useEffect(() => {
+    const channel = supabase
+      .channel('bed-inventory-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'space_blocks' }, () => {
+        setRefreshKey((k) => k + 1);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
+        setRefreshKey((k) => k + 1);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const allBeds = useAsync(() => getBedsStatus({}), [refreshKey]);
 
   const sectionFiltered = useMemo(() => {
     if (allBeds.status !== 'success') return [] as BedRow[];
@@ -99,16 +119,12 @@ export function AdminBedsPage() {
     };
   }, [filtered, section]);
 
-  function reload() {
-    window.location.reload();
-  }
-
   return (
     <>
       <PageHeader
         eyebrow="Inventory"
         title="Bed inventory"
-        intro="Click a bed for details. Use the women-reserved panel to designate safe beds for female guests."
+        intro="Live seat-map view. Updates automatically."
       />
 
       <div className="mb-3 rounded-card border border-line bg-surface p-3">
@@ -133,14 +149,9 @@ export function AdminBedsPage() {
             </div>
           )}
         </div>
-        {(acReserved === 0 && naReserved === 0) && (
-          <p className="mt-2 rounded-input border border-[#FBF0DC] bg-[#FBF0DC] px-3 py-2 text-xs text-[#8A5A00]">
-            The published policy targets {AC_TARGET} AC individual beds and {NA_BUNK_TARGET * 2} Non-AC spaces for women-reserved use. Designate them here after verifying the physical layout.
-          </p>
-        )}
       </div>
 
-      <div className="mb-4 space-y-2">
+      <div className="mb-3 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-input border border-line bg-surface">
             <button
@@ -220,7 +231,6 @@ export function AdminBedsPage() {
         />
       )}
 
-      {/* AC GRID - 10 columns, fills width, legible tiles */}
       {allBeds.status === 'success' && section === 'AC' && grouped.individual.length > 0 && (
         <div className="w-full rounded-card border border-line bg-bg p-4">
           <div className="grid grid-cols-5 gap-3 sm:grid-cols-10">
@@ -235,7 +245,6 @@ export function AdminBedsPage() {
         </div>
       )}
 
-      {/* NON-AC GRID - 20 columns, fills width, legible bunk cells */}
       {allBeds.status === 'success' && section === 'NON_AC' && grouped.units.length > 0 && (
         <div className="w-full rounded-card border border-line bg-bg p-4">
           <div className="grid grid-cols-10 gap-2 sm:grid-cols-[repeat(20,minmax(0,1fr))]">
@@ -255,26 +264,25 @@ export function AdminBedsPage() {
         <BedDrawer
           spaceId={selected}
           canBlock={canBlock}
+          canAssign={canAssign}
           onClose={() => setSelected(null)}
-          onChanged={() => { setSelected(null); reload(); }}
+          onChanged={() => setSelected(null)}
         />
       )}
 
       {showProposal && (
         <ProposalModal
           onClose={() => setShowProposal(false)}
-          onApplied={() => { setShowProposal(false); reload(); }}
+          onApplied={() => { setShowProposal(false); }}
         />
       )}
     </>
   );
 }
 
-// ─── AC Bed Tile (Sized up for legibility) ────────────────────────
 function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) {
   const s = STATUS_STYLE[row.status];
   const title = `${row.code} — ${s.label}${row.current_booking_reference ? ` · ${row.current_booking_reference}` : ''}${row.women_reserved ? ' · women-reserved' : ''}`;
-  // Shorten family compartment IDs for display (e.g., F-001-B1 -> F1-B1)
   const displayCode = row.code.startsWith('F-') 
     ? row.code.replace('F-00', 'F').replace('F-0', 'F') 
     : row.code.replace('AC-', '');
@@ -288,20 +296,12 @@ function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) 
       className="group relative flex h-[64px] w-full flex-col items-center justify-between rounded-md border-2 py-1 transition-transform hover:scale-105 hover:z-10 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-900"
       style={{ background: s.fill, borderColor: s.border }}
     >
-      {/* Pillow */}
       <div className="h-2 w-3/4 rounded-sm opacity-60" style={{ background: s.pillow }} />
-      
-      {/* Bed ID */}
       <span className="font-mono text-[10px] font-semibold tracking-tight" style={{ color: s.text }}>
         {displayCode}
       </span>
-
-      {/* Women-reserved badge */}
       {row.women_reserved && (
-        <span
-          className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-[#B3261E] text-[8px] font-bold text-white shadow"
-          aria-label="women-reserved"
-        >
+        <span className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-[#B3261E] text-[8px] font-bold text-white shadow" aria-label="women-reserved">
           W
         </span>
       )}
@@ -309,7 +309,6 @@ function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) 
   );
 }
 
-// ─── Non-AC Bunk (Sized up for legibility) ────────────────────────
 function CompactBunk({ unitCode, spaces, onSelect }: {
   unitCode: string;
   spaces: BedRow[];
@@ -326,18 +325,13 @@ function CompactBunk({ unitCode, spaces, onSelect }: {
       ) : (
         <div className="h-7 w-full rounded-sm border border-dashed border-line opacity-25" />
       )}
-      
       <div className="h-1" />
-      
       {lower ? (
         <CompactBunkCell row={lower} letter="L" onClick={() => onSelect(lower.space_id)} />
       ) : (
         <div className="h-7 w-full rounded-sm border border-dashed border-line opacity-25" />
       )}
-      
-      <span className="mt-1 font-mono text-[9px] font-medium text-muted">
-        {displayCode}
-      </span>
+      <span className="mt-1 font-mono text-[9px] font-medium text-muted">{displayCode}</span>
     </div>
   );
 }
@@ -360,161 +354,23 @@ function CompactBunkCell({ row, letter, onClick }: {
       style={{ background: s.fill, borderColor: s.border, color: s.text }}
     >
       <span className="text-[10px] font-bold">{letter}</span>
-      
-      {row.women_reserved && (
-        <span className="h-2 w-2 rounded-full bg-[#B3261E]" aria-hidden />
-      )}
+      {row.women_reserved && <span className="h-2 w-2 rounded-full bg-[#B3261E]" aria-hidden />}
     </button>
   );
 }
 
-// ─── Proposal modal (Unchanged) ────────────────────────────────────
-function ProposalModal({ onClose, onApplied }: { onClose: () => void; onApplied: () => void }) {
-  const proposal = useAsync(() => proposeWomenReserved(AC_TARGET, NA_BUNK_TARGET), []);
-  const [acknowledged, setAcknowledged] = useState(false);
-  const [applying, setApplying] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const acProposal = proposal.status === 'success'
-    ? proposal.data.filter((p) => p.product_type === 'ac_individual') : [];
-  const naProposal = proposal.status === 'success'
-    ? proposal.data.filter((p) => p.product_type === 'non_ac_space') : [];
-  const naBunkCount = new Set(naProposal.map((p) => p.code.replace(/-[LU]$/, ''))).size;
-
-  async function apply() {
-    if (proposal.status !== 'success' || proposal.data.length === 0) return;
-    setApplying(true);
-    setErr(null);
-    try {
-      await applyWomenReserved(proposal.data.map((p) => p.space_id));
-      onApplied();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Failed to apply');
-    } finally {
-      setApplying(false);
-    }
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-card bg-surface shadow-overlay"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
-          <h2 className="text-base font-semibold text-ink">Women-reserved proposal</h2>
-          <button onClick={onClose} aria-label="Close" className="rounded-input p-1.5 text-muted hover:bg-bg">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="px-5 py-4 space-y-4">
-          <div className="rounded-input border border-[#FBEAE8] bg-[#FBEAE8] p-3 text-sm text-[#7A1A15]">
-            <strong>This is a starting proposal, not a safety claim.</strong> It selects
-            low-numbered beds for review. Before confirming, verify against the actual
-            physical layout — partitions, aisle position, proximity to other women-reserved
-            beds, ladder access for upper bunks, and washroom access.
-          </div>
-
-          {proposal.status === 'loading' && <Spinner />}
-          {proposal.status === 'error' && <ErrorState message={proposal.error.message} />}
-          {proposal.status === 'success' && proposal.data.length === 0 && (
-            <EmptyState
-              title="Nothing to add."
-              body={`Designation is already at or above the target of ${AC_TARGET} AC beds and ${NA_BUNK_TARGET} Non-AC bunk units.`}
-            />
-          )}
-
-          {proposal.status === 'success' && proposal.data.length > 0 && (
-            <>
-              <div>
-                <p className="text-sm font-semibold text-ink">
-                  Proposed additions ({proposal.data.length} spaces)
-                </p>
-                <p className="text-xs text-muted">
-                  {acProposal.length} AC individual beds · {naBunkCount} Non-AC bunk units ({naProposal.length} spaces)
-                </p>
-              </div>
-
-              {acProposal.length > 0 && (
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted">AC individual beds</p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {acProposal.map((p) => (
-                      <span key={p.space_id} className="rounded border border-line bg-bg px-2 py-0.5 font-mono text-xs text-ink">{p.code}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {naProposal.length > 0 && (
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted">Non-AC bunk units</p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {Array.from(new Set(naProposal.map((p) => p.code.replace(/-[LU]$/, '')))).sort().map((unit) => (
-                      <span key={unit} className="rounded border border-line bg-bg px-2 py-0.5 font-mono text-xs text-ink">{unit}</span>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-xs text-muted">
-                    Both the upper and lower space of each unit will be designated together.
-                  </p>
-                </div>
-              )}
-
-              <label className="flex items-start gap-2 rounded-input border border-line bg-bg p-3 text-sm text-ink">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={acknowledged}
-                  onChange={(e) => setAcknowledged(e.target.checked)}
-                />
-                <span>
-                  I have verified the physical layout of these beds, confirmed they meet the
-                  property's safety requirements for women-reserved use, and accept
-                  responsibility for this designation. I understand I can revoke it at any
-                  time if the layout changes.
-                </span>
-              </label>
-
-              {err && <p role="alert" className="text-sm text-[#B3261E]">{err}</p>}
-            </>
-          )}
-        </div>
-
-        <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-surface px-5 py-3">
-          <Button variant="secondary" onClick={onClose} disabled={applying}>Cancel</Button>
-          <Button
-            onClick={apply}
-            loading={applying}
-            disabled={!acknowledged || proposal.status !== 'success' || proposal.data.length === 0}
-          >
-            Apply designation
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Bed Drawer (Unchanged) ────────────────────────────────────────
 function BedDrawer({
-  spaceId, canBlock, onClose, onChanged,
+  spaceId, canBlock, canAssign, onClose, onChanged,
 }: {
   spaceId: string;
   canBlock: boolean;
+  canAssign: boolean;
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const detail = useAsync(() => getBedDetail(spaceId), [spaceId]);
+  const detail = useAsync(() => getBedDetail(spaceId), [spaceId, onChanged]);
 
+  // Maintenance state
   const [fromDate, setFromDate] = useState('');
   const [fromHour, setFromHour] = useState('10');
   const [fromMinute, setFromMinute] = useState('00');
@@ -528,6 +384,12 @@ function BedDrawer({
   const [reason, setReason] = useState('');
   const [blocking, setBlocking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // Manual Assign state
+  const [assignRef, setAssignRef] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [assignErr, setAssignErr] = useState<string | null>(null);
+  const [assignSuccess, setAssignSuccess] = useState(false);
 
   function clearForm() {
     setFromDate(''); setFromHour('10'); setFromMinute('00'); setFromPeriod('AM');
@@ -567,17 +429,32 @@ function BedDrawer({
     finally { setBlocking(false); }
   }
 
+  async function handleManualAssign(e: React.FormEvent) {
+    e.preventDefault();
+    setAssigning(true); setAssignErr(null); setAssignSuccess(false);
+    try {
+      // Find booking ID by reference
+      const { data: booking, error: bErr } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('reference', assignRef.trim().toUpperCase())
+        .maybeSingle();
+
+      if (bErr) throw bErr;
+      if (!booking) throw new Error('Booking reference not found');
+
+      await assignBedManual(booking.id, spaceId);
+      setAssignSuccess(true);
+      setAssignRef('');
+      onChanged();
+    } catch (e2) {
+      setAssignErr(e2 instanceof Error ? e2.message : 'Assignment failed');
+    } finally { setAssigning(false); }
+  }
+
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-card bg-surface shadow-overlay"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-card bg-surface shadow-overlay" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
           <h2 className="text-base font-semibold text-ink">Bed details</h2>
           <button onClick={onClose} aria-label="Close" className="rounded-input p-1.5 text-muted hover:bg-bg">
@@ -588,13 +465,35 @@ function BedDrawer({
           </button>
         </div>
 
-        <div className="px-5 py-4">
+        <div className="px-5 py-4 space-y-6">
           {detail.status === 'loading' && <Spinner />}
           {detail.status === 'error' && <ErrorState message={detail.error.message} />}
           {detail.status === 'success' && <BedDetailBody detail={detail.data} />}
 
+          {/* ── Manual Assignment ── */}
+          {canAssign && (
+            <div className="border-t border-line pt-4">
+              <h3 className="text-sm font-semibold text-ink">Assign / Reassign Booking</h3>
+              <p className="text-xs text-muted mb-3">Enter a confirmed booking reference to assign it to this bed. This will override existing allocations.</p>
+              
+              <form onSubmit={handleManualAssign} className="flex gap-2">
+                <input
+                  className={`${inputClass} flex-1`}
+                  placeholder="e.g. SB-20231025-A1B2C3"
+                  value={assignRef}
+                  onChange={(e) => setAssignRef(e.target.value)}
+                  required
+                />
+                <Button type="submit" loading={assigning}>Assign</Button>
+              </form>
+              {assignErr && <p role="alert" className="mt-2 text-sm text-[#B3261E]">{assignErr}</p>}
+              {assignSuccess && <p role="status" className="mt-2 text-sm text-[#2E7D5B]">Booking successfully assigned.</p>}
+            </div>
+          )}
+
+          {/* ── Maintenance Block ── */}
           {canBlock && (
-            <div className="mt-6 border-t border-line pt-4">
+            <div className="border-t border-line pt-4">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-ink">Block for maintenance</h3>
                 <button type="button" onClick={clearForm} className="text-xs font-medium text-brand-900 hover:underline">Clear all</button>
@@ -604,13 +503,7 @@ function BedDrawer({
                 <div>
                   <p className="mb-1.5 text-sm font-medium text-ink">From <span className="text-[#B3261E]">*</span></p>
                   <div className="flex gap-2">
-                    <input
-                      type="date"
-                      className={`${inputClass} flex-1 cursor-pointer`}
-                      value={fromDate}
-                      onChange={(e) => setFromDate(e.target.value)}
-                      required
-                    />
+                    <input type="date" className={`${inputClass} flex-1 cursor-pointer`} value={fromDate} onChange={(e) => setFromDate(e.target.value)} required />
                     <div className="flex gap-1">
                       <select className={`${inputClass} w-16 cursor-pointer px-2`} value={fromHour} onChange={(e) => setFromHour(e.target.value)}>
                         {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
@@ -629,13 +522,7 @@ function BedDrawer({
                 <div>
                   <p className="mb-1.5 text-sm font-medium text-ink">To <span className="text-[#B3261E]">*</span></p>
                   <div className="flex gap-2">
-                    <input
-                      type="date"
-                      className={`${inputClass} flex-1 cursor-pointer`}
-                      value={toDate}
-                      onChange={(e) => setToDate(e.target.value)}
-                      required
-                    />
+                    <input type="date" className={`${inputClass} flex-1 cursor-pointer`} value={toDate} onChange={(e) => setToDate(e.target.value)} required />
                     <div className="flex gap-1">
                       <select className={`${inputClass} w-16 cursor-pointer px-2`} value={toHour} onChange={(e) => setToHour(e.target.value)}>
                         {HOURS.map((h) => <option key={h} value={h}>{h}</option>)}
@@ -724,6 +611,105 @@ function BedDetailBody({ detail }: { detail: BedDetail }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+function ProposalModal({ onClose, onApplied }: { onClose: () => void; onApplied: () => void }) {
+  const proposal = useAsync(() => proposeWomenReserved(AC_TARGET, NA_BUNK_TARGET), []);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const acProposal = proposal.status === 'success'
+    ? proposal.data.filter((p) => p.product_type === 'ac_individual') : [];
+  const naProposal = proposal.status === 'success'
+    ? proposal.data.filter((p) => p.product_type === 'non_ac_space') : [];
+  const naBunkCount = new Set(naProposal.map((p) => p.code.replace(/-[LU]$/, ''))).size;
+
+  async function apply() {
+    if (proposal.status !== 'success' || proposal.data.length === 0) return;
+    setApplying(true);
+    setErr(null);
+    try {
+      await applyWomenReserved(proposal.data.map((p) => p.space_id));
+      onApplied();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed to apply');
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-card bg-surface shadow-overlay" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-5 py-3">
+          <h2 className="text-base font-semibold text-ink">Women-reserved proposal</h2>
+          <button onClick={onClose} aria-label="Close" className="rounded-input p-1.5 text-muted hover:bg-bg">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          <div className="rounded-input border border-[#FBEAE8] bg-[#FBEAE8] p-3 text-sm text-[#7A1A15]">
+            <strong>This is a starting proposal, not a safety claim.</strong> It selects low-numbered beds for review. Verify against the physical layout before confirming.
+          </div>
+
+          {proposal.status === 'loading' && <Spinner />}
+          {proposal.status === 'error' && <ErrorState message={proposal.error.message} />}
+          {proposal.status === 'success' && proposal.data.length === 0 && (
+            <EmptyState
+              title="Nothing to add."
+              body={`Designation is already at or above the target of ${AC_TARGET} AC beds and ${NA_BUNK_TARGET} Non-AC bunk units.`}
+            />
+          )}
+
+          {proposal.status === 'success' && proposal.data.length > 0 && (
+            <>
+              <div>
+                <p className="text-sm font-semibold text-ink">Proposed additions ({proposal.data.length} spaces)</p>
+                <p className="text-xs text-muted">{acProposal.length} AC individual beds · {naBunkCount} Non-AC bunk units ({naProposal.length} spaces)</p>
+              </div>
+
+              {acProposal.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted">AC individual beds</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {acProposal.map((p) => <span key={p.space_id} className="rounded border border-line bg-bg px-2 py-0.5 font-mono text-xs text-ink">{p.code}</span>)}
+                  </div>
+                </div>
+              )}
+
+              {naProposal.length > 0 && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted">Non-AC bunk units</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {Array.from(new Set(naProposal.map((p) => p.code.replace(/-[LU]$/, '')))).sort().map((unit) => (
+                      <span key={unit} className="rounded border border-line bg-bg px-2 py-0.5 font-mono text-xs text-ink">{unit}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <label className="flex items-start gap-2 rounded-input border border-line bg-bg p-3 text-sm text-ink">
+                <input type="checkbox" className="mt-1" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
+                <span>I have verified the physical layout of these beds, confirmed they meet the property's safety requirements, and accept responsibility for this designation.</span>
+              </label>
+
+              {err && <p role="alert" className="text-sm text-[#B3261E]">{err}</p>}
+            </>
+          )}
+        </div>
+
+        <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-surface px-5 py-3">
+          <Button variant="secondary" onClick={onClose} disabled={applying}>Cancel</Button>
+          <Button onClick={apply} loading={applying} disabled={!acknowledged || proposal.status !== 'success' || proposal.data.length === 0}>Apply designation</Button>
+        </div>
+      </div>
     </div>
   );
 }

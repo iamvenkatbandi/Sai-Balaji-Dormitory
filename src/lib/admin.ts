@@ -382,3 +382,12 @@ export async function getSettlements(limit = 100): Promise<SettlementRow[]> {
   if (error) throw await rpcError(error);
   return (data ?? []) as SettlementRow[];
 }
+
+export async function assignBedManual(bookingId: string, spaceId: string): Promise<string> {
+  const { data, error } = await supabase.rpc('admin_assign_bed_manual', {
+    p_booking_id: bookingId,
+    p_space_id: spaceId,
+  });
+  if (error) throw await rpcError(error);
+  return data as string;
+}
