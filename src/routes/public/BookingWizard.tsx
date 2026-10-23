@@ -108,7 +108,7 @@ export function BookingWizard() {
     try { (e.target as HTMLInputElement).showPicker?.(); } catch {}
   };
 
-    async function handleCreateHold() {
+  async function handleCreateHold() {
     setHoldLoading(true);
     setHoldError(null);
     try {
@@ -151,7 +151,7 @@ export function BookingWizard() {
     setStep(8);
   }
 
-    async function handleDevConfirm() {
+  async function handleDevConfirm() {
     if (!hold) return;
     
     // 1. Show success UI immediately
@@ -511,6 +511,7 @@ export function BookingWizard() {
           {step === 8 && (
             <SectionCard title="Confirmation">
               {confirmState === 'polling' && <Spinner label="Waiting for payment confirmation…" />}
+              
               {confirmState === 'confirmed' && confirmedRow && (
                 <>
                   <p className="text-sm text-ink">
@@ -525,26 +526,58 @@ export function BookingWizard() {
                     Your exact sleeping space will be assigned by property staff at check-in.
                     Bring government-issued photo ID.
                   </p>
+                  
+                  {/* Action Buttons */}
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    {hold && (
+                      <Link
+                        to={`/booking/receipt/${hold.booking_id}`}
+                        className="inline-flex items-center justify-center rounded-input bg-brand-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-700 transition"
+                      >
+                        Download Receipt
+                      </Link>
+                    )}
+                    <Link
+                      to={`/booking/status?ref=${encodeURIComponent(confirmedRow.reference)}`}
+                      className="inline-flex items-center justify-center rounded-input border border-line bg-surface px-5 py-2.5 text-sm font-medium text-ink hover:bg-bg transition"
+                    >
+                      Check booking status
+                    </Link>
+                    <Link
+                      to="/"
+                      className="inline-flex items-center justify-center rounded-input px-5 py-2.5 text-sm font-medium text-brand-900 hover:underline"
+                    >
+                      Return to home
+                    </Link>
+                  </div>
                 </>
               )}
+              
               {confirmState === 'not-confirmed' && (
                 <>
                   <p className="text-sm text-ink">We haven't received payment confirmation yet.</p>
                   <p className="mt-2 text-sm text-muted">
                     If you completed payment, wait a moment then check via Booking Status using your reference and email.
                   </p>
+                  <div className="mt-6">
+                    <Link
+                      to={`/booking/status?ref=${encodeURIComponent(hold?.reference || '')}`}
+                      className="inline-flex items-center justify-center rounded-input border border-line bg-surface px-5 py-2.5 text-sm font-medium text-ink hover:bg-bg transition"
+                    >
+                      Check booking status
+                    </Link>
+                  </div>
                 </>
               )}
-              {confirmState === 'error' && confirmError && <ErrorState message={confirmError} />}
-              <div className="mt-6 flex flex-wrap gap-4">
-                {hold && (
-                  <Link to={`/booking/status?ref=${encodeURIComponent(hold.reference)}`}
-                        className="text-sm font-medium text-brand-900 hover:underline">
-                    Check booking status →
-                  </Link>
-                )}
-                <Link to="/" className="text-sm text-brand-900 hover:underline">Return to home</Link>
-              </div>
+              
+              {confirmState === 'error' && confirmError && (
+                <div className="mt-4">
+                  <ErrorState message={confirmError} />
+                  <div className="mt-4">
+                    <Link to="/" className="text-sm font-medium text-brand-900 hover:underline">Return to home</Link>
+                  </div>
+                </div>
+              )}
             </SectionCard>
           )}
         </div>

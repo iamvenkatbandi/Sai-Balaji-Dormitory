@@ -182,57 +182,9 @@ export interface ReceiptData {
 }
 
 export async function getReceiptData(bookingId: string): Promise<ReceiptData> {
-  // 1. Fetch Booking
-  const { data: booking, error: bErr } = await supabase
-    .from('bookings')
-    .select('*, booking_guests(full_name, is_primary)')
-    .eq('id', bookingId)
-    .maybeSingle();
-
-  if (bErr) throw bErr;
-  if (!booking) throw new Error('Booking not found');
-
-  // 2. Fetch Payments
-  const { data: payments, error: pErr } = await supabase
-    .from('payments')
-    .select('id, amount_paise, status, created_at')
-    .eq('booking_id', bookingId)
-    .order('created_at', { ascending: true });
-
-  if (pErr) throw pErr;
-
-  // 3. Fetch Property Details
-  const { data: property } = await supabase
-    .from('property_contact')
-    .select('*')
-    .maybeSingle();
-
-  const { data: propName } = await supabase
-    .from('properties')
-    .select('name')
-    .limit(1)
-    .maybeSingle();
-
-  return {
-    booking: {
-      id: booking.id,
-      reference: booking.reference,
-      status: booking.status,
-      starts_at: booking.starts_at,
-      ends_at: booking.ends_at,
-      total_paise: booking.total_paise || 0,
-      product_type: booking.product_type,
-      primary_contact_email: booking.primary_contact_email,
-      primary_contact_phone: booking.primary_contact_phone,
-      created_at: booking.created_at,
-    },
-    guest_name: booking.booking_guests?.find((g: any) => g.is_primary)?.full_name || 'Guest',
-    payments: payments || [],
-    property: {
-      name: propName?.name || 'Sai Balaji Dormitory',
-      address_line: property?.address_line || null,
-      phone: property?.phone || null,
-      email: property?.email || null,
-    }
-  };
+  const { data, error } = await supabase.rpc('get_public_receipt', {
+    p_booking_id: bookingId,
+  });
+  if (error) throw error;
+  return data as ReceiptData;
 }

@@ -82,6 +82,9 @@ const router = createBrowserRouter([
       { path: 'register', element: <RegisterPage /> },
       { path: 'forgot-password', element: <ForgotPasswordPage /> },
       { path: 'legal/:slug', element: <LegalPage /> },
+      { path: 'booking/status', element: <BookingStatusPage /> },
+      { path: 'booking/receipt/:id', element: <ReceiptPage /> }, // <-- ADD THIS
+      { path: 'login', element: <LoginPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },
