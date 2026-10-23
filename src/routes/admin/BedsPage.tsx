@@ -100,6 +100,13 @@ export function AdminBedsPage() {
   if (allBeds.status === 'loading') return <Spinner />;
   if (allBeds.status === 'error') return <ErrorState message={allBeds.error.message} />;
 
+  // Split the beds into left and right halves
+  const totalItems = section === 'AC' ? grouped.individual.length : grouped.units.length;
+  const half = Math.ceil(totalItems / 2);
+  
+  const leftItems = section === 'AC' ? grouped.individual.slice(0, half) : grouped.units.slice(0, half);
+  const rightItems = section === 'AC' ? grouped.individual.slice(half) : grouped.units.slice(half);
+
   return (
     <>
       <PageHeader eyebrow="Inventory" title="Bed inventory" intro="Live seat-map view. Updates automatically." />
@@ -159,7 +166,7 @@ export function AdminBedsPage() {
 
       {/* ─── FLOOR PLAN LAYOUT ─────────────────────────────────────── */}
       {filtered.length > 0 && (
-        <div className="relative mx-auto w-full max-w-[1400px] rounded-xl border-2 border-dashed border-gray-400 bg-gray-50 p-6 sm:p-10 shadow-inner">
+        <div className="relative mx-auto w-full max-w-[1500px] rounded-xl border-2 border-dashed border-gray-400 bg-gray-50 p-6 sm:p-10 shadow-inner">
           
           {/* Entrance */}
           <div className="absolute -top-4 left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
@@ -169,7 +176,7 @@ export function AdminBedsPage() {
             <div className="h-4 w-24 bg-gradient-to-b from-gray-200 to-transparent opacity-50" />
           </div>
 
-          <div className="flex w-full gap-4 sm:gap-8 items-stretch justify-center mt-6">
+          <div className="flex w-full gap-4 sm:gap-8 items-stretch justify-center mt-6 overflow-x-auto pb-4">
             
             {/* Washroom Block A (Left) */}
             <Link 
@@ -182,17 +189,34 @@ export function AdminBedsPage() {
             </Link>
 
             {/* Center Grid */}
-            <div className="flex-1 rounded-lg bg-white p-4 shadow-sm border border-gray-200 overflow-x-auto">
-              <div className="mb-3 flex justify-between items-center text-[10px] text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2 min-w-max">
+            <div className="flex-1 rounded-lg bg-white p-4 shadow-sm border border-gray-200 min-w-max">
+              <div className="mb-3 flex justify-between items-center text-[10px] text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">
                 <span>{section === 'AC' ? 'AC Hall Area' : 'Non-AC Hall Area'}</span>
                 <span>{filtered.length} Spaces</span>
               </div>
 
-              <FloorPlanGrid 
-                beds={section === 'AC' ? grouped.individual : grouped.units} 
-                isBunk={section === 'NON_AC'} 
-                onSelect={setSelected} 
-              />
+              <div className="flex items-stretch gap-4 sm:gap-12 w-full max-w-fit mx-auto">
+                {/* Left Side Grid */}
+                <FloorPlanSide 
+                  items={leftItems} 
+                  isBunk={section === 'NON_AC'} 
+                  onSelect={setSelected} 
+                />
+
+                {/* Center Aisle */}
+                <div className="w-12 sm:w-20 bg-gray-100 rounded-md flex flex-col items-center justify-center border-x-2 border-dashed border-gray-300 shrink-0">
+                  <span className="text-gray-400 text-[10px] font-bold uppercase tracking-widest rotate-[-90deg] whitespace-nowrap">
+                    Central Walkway
+                  </span>
+                </div>
+
+                {/* Right Side Grid */}
+                <FloorPlanSide 
+                  items={rightItems} 
+                  isBunk={section === 'NON_AC'} 
+                  onSelect={setSelected} 
+                />
+              </div>
             </div>
 
             {/* Washroom Block B (Right) */}
@@ -227,67 +251,52 @@ export function AdminBedsPage() {
   );
 }
 
-// ─── FLOOR PLAN GRID COMPONENT ─────────────────────────────────────
-function FloorPlanGrid({ beds, isBunk, onSelect }: { 
-  beds: any[]; 
+// ─── NEW FLOOR PLAN SIDE COMPONENT ─────────────────────────────────
+function FloorPlanSide({ items, isBunk, onSelect }: { 
+  items: any[]; 
   isBunk: boolean; 
   onSelect: (id: string) => void 
 }) {
+  // We force exactly 5 rows per side as requested.
   const rows = 5;
-  const totalItems = beds.length;
-  const itemsPerSide = totalItems / 2;
-  const colsPerSide = itemsPerSide / rows;
+  const cols = Math.ceil(items.length / rows);
+  const grid = [];
   
-  const leftItems = beds.slice(0, itemsPerSide);
-  const rightItems = beds.slice(itemsPerSide);
-
-  const renderSide = (sideItems: any[]) => {
-    const cols = [];
-    for (let i = 0; i < colsPerSide; i++) {
-      cols.push(sideItems.slice(i * rows, (i + 1) * rows));
+  // Build a 2D grid mapping left-to-right (row major)
+  for (let r = 0; r < rows; r++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) {
+      const index = r * cols + c;
+      if (index < items.length) {
+        row.push(items[index]);
+      }
     }
-
-    // Group columns into blocks of 2, separated by walkways
-    const blocks = [];
-    for (let i = 0; i < cols.length; i += 2) {
-      blocks.push(cols.slice(i, i + 2));
-    }
-
-    return (
-      <div className="flex gap-4 sm:gap-6">
-        {blocks.map((block, bIdx) => (
-          <div key={bIdx} className="flex gap-2 sm:gap-3">
-            {block.map((col, cIdx) => (
-              <div key={cIdx} className="flex flex-col gap-2 sm:gap-3">
-                {col.map((item) => {
-                  if (isBunk) {
-                    return <CompactBunk key={item.unitCode} unitCode={item.unitCode} spaces={item.spaces} onSelect={onSelect} />;
-                  } else {
-                    return <CompactBedTile key={item.space_id} row={item} onClick={() => onSelect(item.space_id)} />;
-                  }
-                })}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    );
-  };
+    grid.push(row);
+  }
 
   return (
-    <div className="flex items-stretch gap-4 sm:gap-10 w-full max-w-fit mx-auto">
-      {/* Left Side */}
-      {renderSide(leftItems)}
-
-      {/* Center Aisle */}
-      <div className="w-10 sm:w-16 bg-gray-100 rounded-md flex flex-col items-center justify-center border-x-2 border-dashed border-gray-300 shrink-0">
-        <span className="text-gray-400 text-[9px] font-bold uppercase tracking-widest rotate-[-90deg] whitespace-nowrap">
-          Central Walkway
-        </span>
-      </div>
-
-      {/* Right Side */}
-      {renderSide(rightItems)}
+    <div className="flex flex-col gap-2 sm:gap-3">
+      {grid.map((row, rIdx) => (
+        <div 
+          key={rIdx} 
+          // Adds a horizontal walkway after every 2 rows
+          className={`flex gap-2 sm:gap-3 ${rIdx > 0 && rIdx % 2 === 0 ? 'mt-6 sm:mt-8' : ''}`}
+        >
+          {row.map((item, cIdx) => (
+            <div 
+              key={cIdx} 
+              // Adds a vertical walkway after every 2 columns
+              className={`${cIdx > 0 && cIdx % 2 === 0 ? 'ml-6 sm:ml-8' : ''}`}
+            >
+              {isBunk ? (
+                <CompactBunk unitCode={item.unitCode} spaces={item.spaces} onSelect={onSelect} />
+              ) : (
+                <CompactBedTile row={item} onClick={() => onSelect(item.space_id)} />
+              )}
+            </div>
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -297,8 +306,15 @@ function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) 
   const s = STATUS_STYLE[row.status];
   const title = `${row.code} — ${s.label}${row.current_booking_reference ? ` · ${row.current_booking_reference}` : ''}${row.women_reserved ? ' · women-reserved' : ''}`;
   const displayCode = row.code.startsWith('F-') ? row.code.replace('F-00', 'F').replace('F-0', 'F') : row.code.replace('AC-', '');
+  
   return (
-    <button type="button" onClick={onClick} title={title} className="group relative flex h-[60px] w-full min-w-[56px] flex-col items-center justify-between rounded border-2 py-1 transition-transform hover:scale-105 hover:z-10 hover:shadow-md focus:outline-none" style={{ background: s.fill, borderColor: s.border }}>
+    <button 
+      type="button" 
+      onClick={onClick} 
+      title={title} 
+      className="group relative flex h-[60px] w-[56px] flex-col items-center justify-between rounded border-2 py-1 transition-transform hover:scale-105 hover:z-10 hover:shadow-md focus:outline-none" 
+      style={{ background: s.fill, borderColor: s.border }}
+    >
       <div className="h-1.5 w-3/4 rounded-full opacity-60" style={{ background: s.pillow }} />
       <span className="font-mono text-[9px] font-bold tracking-tight" style={{ color: s.text }}>{displayCode}</span>
       {row.women_reserved && <span className="absolute -right-1.5 -top-1.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-[#B3261E] text-[7px] font-bold text-white shadow">W</span>}
@@ -309,8 +325,9 @@ function CompactBedTile({ row, onClick }: { row: BedRow; onClick: () => void }) 
 function CompactBunk({ unitCode, spaces, onSelect }: { unitCode: string; spaces: BedRow[]; onSelect: (id: string) => void }) {
   const upper = spaces.find((s) => s.position === 'upper');
   const lower = spaces.find((s) => s.position === 'lower');
+  
   return (
-    <div className="flex flex-col items-center w-full min-w-[44px]">
+    <div className="flex flex-col items-center w-[44px]">
       {upper ? <CompactBunkCell row={upper} letter="U" onClick={() => onSelect(upper.space_id)} /> : <div className="h-6 w-full rounded-sm border border-dashed border-line opacity-25" />}
       <div className="h-0.5" />
       {lower ? <CompactBunkCell row={lower} letter="L" onClick={() => onSelect(lower.space_id)} /> : <div className="h-6 w-full rounded-sm border border-dashed border-line opacity-25" />}
@@ -322,7 +339,12 @@ function CompactBunk({ unitCode, spaces, onSelect }: { unitCode: string; spaces:
 function CompactBunkCell({ row, letter, onClick }: { row: BedRow; letter: 'U' | 'L'; onClick: () => void }) {
   const s = STATUS_STYLE[row.status];
   return (
-    <button type="button" onClick={onClick} className="group relative flex h-6 w-full items-center justify-between rounded-sm border px-1 transition-transform hover:scale-110 hover:z-10 hover:shadow-md" style={{ background: s.fill, borderColor: s.border, color: s.text }}>
+    <button 
+      type="button" 
+      onClick={onClick} 
+      className="group relative flex h-6 w-full items-center justify-between rounded-sm border px-1 transition-transform hover:scale-110 hover:z-10 hover:shadow-md" 
+      style={{ background: s.fill, borderColor: s.border, color: s.text }}
+    >
       <span className="text-[9px] font-bold">{letter}</span>
       {row.women_reserved && <span className="h-1.5 w-1.5 rounded-full bg-[#B3261E]" />}
     </button>
