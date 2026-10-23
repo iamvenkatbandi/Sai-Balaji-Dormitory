@@ -51,6 +51,7 @@ import { AdminStaffPage } from './routes/admin/StaffPage';
 import { AdminPoliciesPage } from './routes/admin/PoliciesPage';
 import { AdminReceiptsPage } from './routes/admin/ReceiptsPage';
 import { ReportPrintPage } from './routes/admin/ReportPrintPage';
+import { AdminEnquiriesPage } from './routes/admin/EnquiriesPage';
 
 import { ReceiptPage } from './routes/shared/ReceiptPage';
 
@@ -123,6 +124,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminDashboardPage /> },
           { path: 'reception', element: <AdminReceptionPage /> },
+          { path: 'enquiries', element: <AdminEnquiriesPage /> },
           { path: 'beds', element: <AdminBedsPage /> },
           { path: 'bookings', element: <AdminBookingsPage /> },
           { path: 'bookings/:id', element: <AdminBookingDetailPage /> },
