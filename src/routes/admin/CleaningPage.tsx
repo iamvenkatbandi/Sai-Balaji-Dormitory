@@ -8,22 +8,19 @@ import { ErrorState } from '../../components/ErrorState';
 import { EmptyState } from '../../components/EmptyState';
 import { Button } from '../../components/Button';
 import { formatDateTime } from '../../lib/format';
-import type { CleaningTask } from '../../lib/database.types';
 
-interface Row extends CleaningTask { space_code: string; section_code: string; }
+interface Row {
+  id: string;
+  space_code: string;
+  section_code: string;
+  created_at: string;
+}
 
 async function loadTasks(): Promise<Row[]> {
-  const { data: tasks, error } = await supabase
-    .from('cleaning_tasks')
-    .select('*, sleeping_spaces!inner(code, physical_zones!inner(accommodation_sections!inner(code)))')
-    .in('status', ['pending', 'in_progress'])
-    .order('created_at', { ascending: true });
+  // Use the RPC instead of querying the table directly
+  const { data, error } = await supabase.rpc('get_cleaning_tasks');
   if (error) throw error;
-  return (tasks ?? []).map((t: any) => ({
-    ...t,
-    space_code: t.sleeping_spaces?.code ?? '—',
-    section_code: t.sleeping_spaces?.physical_zones?.accommodation_sections?.code ?? '—',
-  })) as Row[];
+  return (data ?? []) as Row[];
 }
 
 export function AdminCleaningPage() {
@@ -33,8 +30,12 @@ export function AdminCleaningPage() {
   if (tasks.status === 'error') return <ErrorState message={tasks.error.message} />;
 
   async function handleComplete(id: string) {
-    try { await completeCleaning(id); window.location.reload(); }
-    catch (e) { alert(e instanceof Error ? e.message : 'Failed'); }
+    try { 
+      await completeCleaning(id); 
+      window.location.reload(); 
+    } catch (e) { 
+      alert(e instanceof Error ? e.message : 'Failed'); 
+    }
   }
 
   return (

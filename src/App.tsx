@@ -4,6 +4,7 @@ import { PortalLayout } from './layouts/PortalLayout';
 import { AdminLayout } from './layouts/AdminLayout';
 import { GuestGuard, StaffGuard, AdminGuard } from './components/Guards';
 
+// Public pages
 import { HomePage } from './routes/public/HomePage';
 import { AcAccommodationPage } from './routes/public/AcAccommodationPage';
 import { NonAcAccommodationPage } from './routes/public/NonAcAccommodationPage';
@@ -21,6 +22,7 @@ import { LegalPage } from './routes/public/LegalPage';
 import { BookingWizard } from './routes/public/BookingWizard';
 import { NotFoundPage } from './routes/public/NotFoundPage';
 
+// Portal pages
 import { DashboardPage } from './routes/portal/DashboardPage';
 import { MyBookingsPage } from './routes/portal/MyBookingsPage';
 import { MyBookingDetailPage } from './routes/portal/MyBookingDetailPage';
@@ -31,6 +33,7 @@ import { NewSupportPage } from './routes/portal/NewSupportPage';
 import { SupportTicketPage } from './routes/portal/SupportTicketPage';
 import { ProfilePage } from './routes/portal/ProfilePage';
 
+// Admin pages
 import { AdminDashboardPage } from './routes/admin/DashboardPage';
 import { AdminBedsPage } from './routes/admin/BedsPage';
 import { AdminBookingsPage } from './routes/admin/BookingsPage';
@@ -38,6 +41,7 @@ import { AdminBookingDetailPage } from './routes/admin/BookingDetailPage';
 import { AdminReceptionPage } from './routes/admin/ReceptionPage';
 import { AdminRatesPage } from './routes/admin/RatesPage';
 import { AdminSettingsPage } from './routes/admin/SettingsPage';
+import { AdminFinancePage } from './routes/admin/FinancePage';
 import { AdminReportsPage } from './routes/admin/ReportsPage';
 import { AdminCleaningPage } from './routes/admin/CleaningPage';
 import { AdminMaintenancePage } from './routes/admin/MaintenancePage';
@@ -114,6 +118,7 @@ const router = createBrowserRouter([
           { path: 'cleaning', element: <AdminCleaningPage /> },
           { path: 'maintenance', element: <AdminMaintenancePage /> },
           { path: 'washrooms', element: <AdminWashroomsPage /> },
+          { path: 'finance', element: <AdminFinancePage /> },
           { path: 'reports', element: <AdminReportsPage /> },
           { path: 'rates', element: <AdminRatesPage /> },
           { path: 'policies', element: <AdminPoliciesPage /> },
